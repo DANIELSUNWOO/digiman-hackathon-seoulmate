@@ -1,0 +1,52 @@
+# ===== 비밀 값 (절대 커밋 금지) =====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.jks
+*.keystore
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+credentials.json
+service-account*.json
+
+# ===== OS / IDE =====
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ===== app: Node / Expo / React Native =====
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.tsbuildinfo
+# Expo가 빌드할 때 자동 생성하는 네이티브 폴더 (CNG)
+app/ios/
+app/android/
+# EAS
+*.ipa
+*.apk
+*.aab
+
+# ===== server: Java / Gradle / Spring Boot =====
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+out/
+bin/
+*.class
+*.log
+HELP.md

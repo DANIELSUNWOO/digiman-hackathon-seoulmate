@@ -1,0 +1,15 @@
+# 테스트는 H2 메모리 DB (Supabase 없어도 돌아감). 스키마는 엔티티에서 자동 생성
+spring:
+  datasource:
+    url: jdbc:h2:mem:seoulmate;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+seoulmate:
+  supabase:
+    issuer: https://test-project.supabase.co/auth/v1
+    jwks-url: https://test-project.supabase.co/auth/v1/.well-known/jwks.json

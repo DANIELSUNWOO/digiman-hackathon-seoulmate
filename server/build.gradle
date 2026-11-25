@@ -23,6 +23,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	// DB 마이그레이션 (src/main/resources/db/migration)
+	implementation 'org.springframework.boot:spring-boot-starter-flyway'
+	implementation 'org.flywaydb:flyway-database-postgresql'
+	// Swagger UI (/swagger-ui.html). Boot 4 는 springdoc 3.x 필요. 빌드가 안 되면 이 줄만 주석 처리
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -33,6 +38,7 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testRuntimeOnly 'com.h2database:h2'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 }
 

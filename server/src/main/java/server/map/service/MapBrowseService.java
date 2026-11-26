@@ -212,9 +212,9 @@ public class MapBrowseService {
         return map;
     }
 
-    /** 지도 제목. 번역 칸(secret_maps.title_translated)이 마이그레이션되면 translated 를 채운다 */
+    /** 지도 제목 (여행자에게는 일본어 번역과 함께) */
     private static LocalizedText title(SecretMap m) {
-        return LocalizedText.of(m.getTitle(), null, MAP_LANG);
+        return LocalizedText.of(m.getTitle(), m.getTitleTranslated(), MAP_LANG);
     }
 
     private static PreviewSpot previewSpot(Spot s) {

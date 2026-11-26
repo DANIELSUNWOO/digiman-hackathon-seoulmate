@@ -192,4 +192,22 @@ class AlbumReviewIntegrationTest {
                 ErrorCode.MATCH_NOT_ACTIVE);
         assertThat(albumReviewService.album(auth(f.traveler()), f.matchId()).items()).hasSize(3);   // 앨범은 그대로 볼 수 있다
     }
+
+    @Test
+    void 기간_만료된_매칭도_후기를_남기고_취소된_매칭은_못_남긴다() {
+        Fixture expired = visited();
+        Match m = matchRepository.findById(expired.matchId()).orElseThrow();
+        m.expire(now);
+        matchRepository.save(m);
+        albumService.createForMatch(expired.matchId(), null, null);      // 자동 종료 배치와 같은 순서
+        albumReviewService.review(auth(expired.traveler()), expired.matchId(), new ReviewRequest(3, "またいつか"));
+        assertThat(albumReviewService.reviews(auth(expired.mate()), expired.matchId())).hasSize(1);
+
+        Fixture canceled = visited();
+        Match c = matchRepository.findById(canceled.matchId()).orElseThrow();
+        c.cancel(canceled.traveler().getId(), null, null, now);
+        matchRepository.save(c);
+        assertError(() -> albumReviewService.review(auth(canceled.traveler()), canceled.matchId(), new ReviewRequest(3, null)),
+                ErrorCode.MATCH_NOT_COMPLETED);
+    }
 }

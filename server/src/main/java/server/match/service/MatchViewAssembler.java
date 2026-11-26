@@ -81,7 +81,7 @@ public class MatchViewAssembler {
 
     public Object title(SecretMap map, UUID viewerId, Match m) {
         if (!m.isTraveler(viewerId)) return map.getTitle();
-        return LocalizedText.of(map.getTitle(), null, "ko");
+        return LocalizedText.of(map.getTitle(), map.getTitleTranslated(), "ko");
     }
 
     /** API v1.5: 차단당한 쪽에게는 BLOCKED 대신 ENDED (차단 사실을 드러내지 않음) */

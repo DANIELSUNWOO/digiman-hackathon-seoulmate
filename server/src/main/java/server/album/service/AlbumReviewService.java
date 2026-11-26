@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 /**
  * [서버 B] 앨범·상호 후기 (ALBUM-01·02, REVIEW-01·02, F-33·F-34).
  * - 앨범은 여행 완료 때 서버 A가 AlbumService.createForMatch 로 만든다. 내용은 따로 저장하지 않고 방문 기록·리액션을 모아 보여 준다
- * - 후기는 여행 완료(COMPLETED) 뒤에만, 매칭마다 한 사람당 한 번. 받는 사람은 매칭 상대로 자동 지정. 차단 관계면 불가
+ * - 후기는 여행이 끝난 뒤(COMPLETED·EXPIRED)에만, 매칭마다 한 사람당 한 번. 받는 사람은 매칭 상대로 자동 지정. 차단 관계면 불가
  */
 @Service
 @RequiredArgsConstructor
@@ -88,11 +88,14 @@ public class AlbumReviewService {
 
     // ---------- 후기 ----------
 
-    /** REVIEW-01 상호 후기 작성. 여행 완료 뒤 한 번만 */
+    /** REVIEW-01 상호 후기 작성. 여행이 끝나 앨범이 생긴 매칭(완료·기간 만료)에서 한 번만 */
     @Transactional
     public ReviewCreated review(AuthUser me, Long matchId, ReviewRequest req) {
         Match m = matchAccess.member(matchId, me);
-        if (m.getStatus() != MatchStatus.COMPLETED) throw new ApiException(ErrorCode.MATCH_NOT_COMPLETED);
+        // 화면 명세 v9: 기간 만료(T-91)도 앨범(T-31) → 후기(T-32)로 이어진다. 취소·차단·진행 중은 불가
+        if (m.getStatus() != MatchStatus.COMPLETED && m.getStatus() != MatchStatus.EXPIRED) {
+            throw new ApiException(ErrorCode.MATCH_NOT_COMPLETED);
+        }
         // 완료 뒤 어느 한쪽이 차단했으면 후기를 남기지 않는다 (차단당한 쪽 의견은 BLOCK-03 으로)
         if (blockRepository.existsBetween(m.getTravelerId(), m.getMateId())) {
             throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);

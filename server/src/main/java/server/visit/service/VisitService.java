@@ -20,6 +20,7 @@ import server.match.service.MatchAccess;
 import server.match.service.MatchProgressService;
 import server.notification.domain.NotificationType;
 import server.notification.service.NotificationPublisher;
+import server.safety.repository.BlockRepository;
 import server.translation.TranslationService;
 import server.visit.domain.SpotVisit;
 import server.visit.domain.VisitReaction;
@@ -56,6 +57,7 @@ public class VisitService {
     private final SpotVisitRepository visitRepository;
     private final VisitReactionRepository reactionRepository;
     private final SpotRepository spotRepository;
+    private final BlockRepository blockRepository;
     private final Clock clock;
 
     /** VISIT-01 방문 인증. 매칭 행을 잠그고 처리해서 같은 매칭의 인증·취소·완료가 겹치지 않게 한다 */
@@ -107,13 +109,16 @@ public class VisitService {
                 reactions.getOrDefault(v.getId(), List.of()))).toList();
     }
 
-    /** VISIT-03 메이트의 리액션·댓글. 이모지와 댓글 중 하나 이상 */
+    /** VISIT-03 메이트의 리액션·댓글. 이모지와 댓글 중 하나 이상. 차단 관계면 불가 */
     @Transactional
     public ReactionCreated react(AuthUser me, Long visitId, ReactionRequest req) {
         SpotVisit visit = visitRepository.findById(visitId)
                 .orElseThrow(() -> new ApiException(ErrorCode.VISIT_NOT_FOUND));
         Match m = matchAccess.mateMember(visit.getMatchId(), me, false);
-        if (m.getStatus() == MatchStatus.BLOCKED) throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
+        // 여행이 끝난 뒤 차단하면 매칭 상태는 COMPLETED 로 남으므로 차단 관계도 확인한다
+        if (m.getStatus() == MatchStatus.BLOCKED || blockRepository.existsBetween(m.getTravelerId(), m.getMateId())) {
+            throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
+        }
 
         String emoji = blankToNull(req.emoji());
         String comment = blankToNull(req.comment());

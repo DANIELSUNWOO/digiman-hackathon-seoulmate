@@ -22,6 +22,7 @@ import server.map.repository.SecretMapRepository;
 import server.match.domain.Match;
 import server.match.domain.MatchStatus;
 import server.match.service.MatchAccess;
+import server.safety.repository.BlockRepository;
 import server.user.domain.User;
 import server.user.repository.UserRepository;
 import server.visit.service.VisitService;
@@ -39,7 +40,7 @@ import java.util.stream.Collectors;
 /**
  * [서버 B] 앨범·상호 후기 (ALBUM-01·02, REVIEW-01·02, F-33·F-34).
  * - 앨범은 여행 완료 때 서버 A가 AlbumService.createForMatch 로 만든다. 내용은 따로 저장하지 않고 방문 기록·리액션을 모아 보여 준다
- * - 후기는 여행 완료(COMPLETED) 뒤에만, 매칭마다 한 사람당 한 번. 받는 사람은 매칭 상대로 자동 지정
+ * - 후기는 여행 완료(COMPLETED) 뒤에만, 매칭마다 한 사람당 한 번. 받는 사람은 매칭 상대로 자동 지정. 차단 관계면 불가
  */
 @Service
 @RequiredArgsConstructor
@@ -51,6 +52,7 @@ public class AlbumReviewService {
     private final SecretMapRepository mapRepository;
     private final UserRepository userRepository;
     private final VisitService visitService;
+    private final BlockRepository blockRepository;
     private final Clock clock;
 
     // ---------- 앨범 ----------
@@ -91,6 +93,10 @@ public class AlbumReviewService {
     public ReviewCreated review(AuthUser me, Long matchId, ReviewRequest req) {
         Match m = matchAccess.member(matchId, me);
         if (m.getStatus() != MatchStatus.COMPLETED) throw new ApiException(ErrorCode.MATCH_NOT_COMPLETED);
+        // 완료 뒤 어느 한쪽이 차단했으면 후기를 남기지 않는다 (차단당한 쪽 의견은 BLOCK-03 으로)
+        if (blockRepository.existsBetween(m.getTravelerId(), m.getMateId())) {
+            throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
+        }
         if (reviewRepository.existsByMatchIdAndReviewerId(matchId, me.id())) {
             throw new ApiException(ErrorCode.ALREADY_REVIEWED);
         }

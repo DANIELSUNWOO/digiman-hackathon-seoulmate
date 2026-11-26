@@ -18,12 +18,16 @@ import server.map.repository.SecretMapRepository;
 import server.map.repository.SpotRepository;
 import server.match.domain.Match;
 import server.match.repository.MatchRepository;
+import server.safety.domain.Block;
+import server.safety.domain.ReportReason;
+import server.safety.repository.BlockRepository;
 import server.trip.domain.Trip;
 import server.trip.repository.TripRepository;
 import server.user.domain.Gender;
 import server.user.domain.User;
 import server.user.repository.UserRepository;
 import server.visit.service.VisitService;
+import server.visit.service.VisitService.ReactionRequest;
 import server.visit.service.VisitService.VisitRequest;
 
 import java.math.BigDecimal;
@@ -51,6 +55,7 @@ class AlbumReviewIntegrationTest {
     @Autowired SecretMapRepository mapRepository;
     @Autowired SpotRepository spotRepository;
     @Autowired ReviewRepository reviewRepository;
+    @Autowired BlockRepository blockRepository;
 
     private static final BigDecimal SPOT_LAT = new BigDecimal("37.5447000");
     private static final BigDecimal SPOT_LNG = new BigDecimal("127.0582000");
@@ -166,5 +171,23 @@ class AlbumReviewIntegrationTest {
 
         Fixture other = visited();
         assertError(() -> albumReviewService.reviews(auth(other.mate()), f.matchId()), ErrorCode.NOT_MATCH_MEMBER);
+    }
+
+    @Test
+    void 여행이_끝난_뒤_차단하면_리액션과_후기를_남길_수_없다() {
+        Fixture f = visited();
+        complete(f, null);
+        Long visitId = visitService.list(auth(f.mate()), f.matchId()).get(0).visitId();
+
+        // 완료 뒤 차단: 매칭 상태는 COMPLETED 로 남고 차단 관계만 저장된다 (서버 A BLOCK-01)
+        blockRepository.save(Block.of(f.traveler().getId(), f.mate().getId(), f.matchId(), ReportReason.ABUSIVE, null, now));
+
+        assertError(() -> visitService.react(auth(f.mate()), visitId, new ReactionRequest("❤️", null)),
+                ErrorCode.MATCH_NOT_ACTIVE);
+        assertError(() -> albumReviewService.review(auth(f.mate()), f.matchId(), new ReviewRequest(1, null)),
+                ErrorCode.MATCH_NOT_ACTIVE);
+        assertError(() -> albumReviewService.review(auth(f.traveler()), f.matchId(), new ReviewRequest(5, null)),
+                ErrorCode.MATCH_NOT_ACTIVE);
+        assertThat(albumReviewService.album(auth(f.traveler()), f.matchId()).items()).hasSize(3);   // 앨범은 그대로 볼 수 있다
     }
 }

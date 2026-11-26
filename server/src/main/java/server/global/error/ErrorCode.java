@@ -82,7 +82,11 @@ public enum ErrorCode {
     MAP_IN_USE(HttpStatus.CONFLICT, "여행 코스로 쓰였거나 방문 기록이 있어 삭제할 수 없습니다."),
     PREVIEW_COUNT_INVALID(HttpStatus.BAD_REQUEST, "공개 스팟은 정확히 2곳을 골라 주세요."),
     SPOT_NOT_IN_MAP(HttpStatus.BAD_REQUEST, "이 지도의 스팟이 아닙니다."),
-    PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "사진을 1장 이상 올려 주세요.");
+    PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "사진을 1장 이상 올려 주세요."),
+
+    // 앨범·후기 (서버 B)
+    ALBUM_NOT_FOUND(HttpStatus.NOT_FOUND, "앨범이 아직 없습니다."),
+    ALREADY_REVIEWED(HttpStatus.CONFLICT, "이미 후기를 남겼습니다.");
 
     private final HttpStatus status;
     private final String message;

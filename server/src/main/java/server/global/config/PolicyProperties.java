@@ -15,8 +15,8 @@ public record PolicyProperties(
         int maxTags,
         int minAge
 ) {
-    /** 채팅에 필요한 인증 수 = ceil(코스 스팟 수 × 0.5). 5곳 → 3, 6곳 → 3, 7곳 → 4 */
+    /** 채팅에 필요한 인증 수 = floor(코스 스팟 수 × 0.5) (API v1.7 내림). 5곳 → 2, 6곳 → 3, 7곳 → 3 */
     public int requiredVisits(int courseSpotCount) {
-        return (int) Math.ceil(courseSpotCount * chatUnlockRatio);
+        return Math.max(1, (int) Math.floor(courseSpotCount * chatUnlockRatio));
     }
 }

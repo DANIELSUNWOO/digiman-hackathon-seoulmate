@@ -98,8 +98,7 @@ class MapBrowseIntegrationTest {
 
     /** 여행자가 지도를 고른 상태 (서버 A MATCH-01 과 같은 결과) */
     private Long select(UUID travelerId, UUID mateId, Long mapId) {
-        Match m = Match.create(1L, travelerId, mateId, now);
-        m.selectCourse(mapId, 2, now);
+        Match m = Match.create(1L, travelerId, mateId, mapId, 2, now);
         return matchRepository.save(m).getId();
     }
 

@@ -1,15 +1,12 @@
 package server.match.service;
 
 import server.global.common.LocalizedText;
-import server.global.config.PolicyProperties;
 import server.global.error.ApiException;
 import server.global.error.ErrorCode;
 import server.global.security.AuthUser;
 import server.map.domain.SecretMap;
-import server.map.domain.Spot;
 import server.map.repository.SecretMapRepository;
 import server.map.repository.SpotRepository;
-import server.map.service.MapQuery;
 import server.match.domain.Match;
 import server.visit.domain.SpotVisit;
 import server.visit.repository.SpotVisitRepository;
@@ -17,14 +14,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** 티켓 5: 메이트 지도 목록(공개 필드 제한), 코스 선택, 코스 지도 */
+/**
+ * 티켓 5: 코스 지도 (MATCH-06).
+ * API v1.7: 메이트 지도 목록(MATCH-04)·코스 선택(MATCH-05)은 삭제. 지도 고르기는 서버 B의 MAP-07·08,
+ * 매칭 + 코스 확정은 MATCH-01 이 한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class CourseService {
@@ -37,35 +36,6 @@ public class CourseService {
     private final SecretMapRepository mapRepository;
     private final SpotRepository spotRepository;
     private final SpotVisitRepository visitRepository;
-    private final MapQuery mapQuery;
-    private final PolicyProperties policy;
-    private final Clock clock;
-
-    /**
-     * MATCH-04 메이트 지도 목록 (MapQuery = B 구현).
-     * 공개 스팟 2곳 외 스팟은 개수만 준다. 앱에서 숨기는 게 아니라 서버가 아예 보내지 않는다.
-     */
-    @Transactional(readOnly = true)
-    public List<MapQuery.PublicMap> mateMaps(AuthUser me, Long matchId) {
-        Match m = matchAccess.travelerMember(matchId, me, false);
-        if (!m.getStatus().isActive()) throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
-        return mapQuery.findPublicMaps(m.getMateId());
-    }
-
-    /** MATCH-05 코스 지도 선택 → 여행 시작. required_visits 를 이때 계산해 저장 */
-    @Transactional
-    public MatchDtos.CourseSelected selectCourse(AuthUser me, Long matchId, Long mapId) {
-        Match m = matchAccess.travelerMember(matchId, me, true);
-        SecretMap map = mapRepository.findById(mapId)
-                .filter(x -> x.getMateId().equals(m.getMateId()))
-                .orElseThrow(() -> new ApiException(ErrorCode.MAP_NOT_AVAILABLE));
-        if (!mapQuery.isPublic(map.getId())) throw new ApiException(ErrorCode.MAP_NOT_AVAILABLE);
-
-        int spotCount = (int) mapQuery.spotCount(map.getId());
-        m.selectCourse(map.getId(), policy.requiredVisits(spotCount), LocalDateTime.now(clock));
-        return new MatchDtos.CourseSelected(m.getId(), m.getStatus().name(), m.getCourseMapId(),
-                new MatchDtos.Progress(0, m.getRequiredVisits(), spotCount));
-    }
 
     /** MATCH-06 코스 지도 (스팟 전체 + 스탬프) */
     @Transactional(readOnly = true)
@@ -82,7 +52,7 @@ public class CourseService {
                             s.photoUrls(), text(s.getReason(), s.getReasonTranslated()),
                             text(s.getReview(), s.getReviewTranslated()), v != null, v == null ? null : v.getId());
                 }).toList();
-        return new MatchDtos.CourseView(new MatchDtos.MapHeader(map.getId(), map.getTitle(), caption(map)),
+        return new MatchDtos.CourseView(new MatchDtos.MapHeader(map.getId(), views.title(map, me.id(), m), caption(map)),
                 views.progress(m), spots);
     }
 

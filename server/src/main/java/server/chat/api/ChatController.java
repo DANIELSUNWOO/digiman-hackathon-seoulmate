@@ -19,11 +19,10 @@ public class ChatController {
 
     private final ChatService chatService;
 
-    @Operation(summary = "CHAT-01 채팅 열기 수락/거절 (양쪽 수락 시 OPEN)")
-    @PostMapping("/chat/accept")
-    public ChatService.AcceptResponse accept(AuthUser me, @PathVariable Long matchId,
-                                             @Valid @RequestBody ChatService.AcceptRequest req) {
-        return chatService.answer(me, matchId, req.accept());
+    @Operation(summary = "CHAT-01 채팅 열기 (여행자, 필요 인증 수 달성 후 바로 OPEN)")
+    @PostMapping("/chat/open")
+    public ChatService.OpenResponse open(AuthUser me, @PathVariable Long matchId) {
+        return chatService.open(me, matchId);
     }
 
     @Operation(summary = "CHAT-02 쪽지 목록 (after 이후, 오래된 순)")

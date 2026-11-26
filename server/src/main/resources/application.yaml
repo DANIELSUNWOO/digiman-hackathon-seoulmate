@@ -21,6 +21,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # Supabase public 스키마에 기본 객체가 있어도 멈추지 않게: 기록 표가 없으면 0번으로 기준을 잡고 V1부터 실행
+    baseline-on-migrate: true
+    baseline-version: 0
   servlet:
     multipart:
       max-file-size: 5MB

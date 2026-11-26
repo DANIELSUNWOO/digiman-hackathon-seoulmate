@@ -89,8 +89,7 @@ class AlbumReviewIntegrationTest {
             spotIds.add(spotRepository.save(s).getId());
         }
         Trip trip = tripRepository.save(Trip.of(traveler.getId(), today, today.plusDays(3), now));
-        Match m = Match.create(trip.getId(), traveler.getId(), mate.getId(), now);
-        m.selectCourse(map.getId(), 3, now);
+        Match m = Match.create(trip.getId(), traveler.getId(), mate.getId(), map.getId(), 3, now);
         m = matchRepository.save(m);
         for (int i = 0; i < 3; i++) {
             visitService.verify(auth(traveler), m.getId(),

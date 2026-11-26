@@ -4,7 +4,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
-/** API 명세서 v1.4 의 에러 코드. 앱은 code 를 보고 일본어/한국어 문구를 정한다. 새 코드는 여기에 추가 */
+/** API 명세서 v1.7 의 에러 코드. 앱은 code 를 보고 일본어/한국어 문구를 정한다. 새 코드는 여기에 추가 */
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {
@@ -28,7 +28,7 @@ public enum ErrorCode {
     NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
     PROFILE_REQUIRED(HttpStatus.CONFLICT, "프로필을 먼저 등록해 주세요."),
     PROFILE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "프로필이 이미 등록되어 있습니다. 수정은 PATCH /users/me 를 사용하세요."),
-    TAG_COUNT_INVALID(HttpStatus.BAD_REQUEST, "취향은 1~10개 선택해 주세요."),
+    TAG_COUNT_INVALID(HttpStatus.BAD_REQUEST, "취향은 1개 이상, 대분류마다 2개까지 선택해 주세요."),
     INVALID_TAG(HttpStatus.BAD_REQUEST, "선택할 수 없는 취향입니다."),
     PREFERENCES_NOT_FOUND(HttpStatus.NOT_FOUND, "매칭 조건이 없습니다."),
     INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, "종료일이 시작일보다 빠릅니다."),
@@ -47,13 +47,11 @@ public enum ErrorCode {
     MATCH_NOT_ACTIVE(HttpStatus.CONFLICT, "진행 중인 매칭이 아닙니다."),
     MATCH_NOT_ON_COURSE(HttpStatus.CONFLICT, "여행 중인 매칭이 아닙니다."),
     MATCH_NOT_COMPLETED(HttpStatus.CONFLICT, "여행 완료 전입니다."),
-    MATE_CANNOT_CANCEL(HttpStatus.FORBIDDEN, "메이트는 매칭을 취소할 수 없습니다."),
     MAP_NOT_AVAILABLE(HttpStatus.BAD_REQUEST, "고를 수 없는 지도입니다."),
-    COURSE_ALREADY_SELECTED(HttpStatus.CONFLICT, "이미 코스를 골랐습니다."),
     COURSE_NOT_SELECTED(HttpStatus.CONFLICT, "아직 코스를 고르지 않았습니다."),
 
     // 채팅
-    CHAT_NOT_REQUESTED(HttpStatus.CONFLICT, "아직 채팅을 열 수 없습니다."),
+    CHAT_NOT_READY(HttpStatus.CONFLICT, "아직 채팅을 열 수 없습니다. 필요한 만큼 인증해 주세요."),
     CHAT_ALREADY_OPEN(HttpStatus.CONFLICT, "채팅이 이미 열려 있습니다."),
     CHAT_NOT_OPEN(HttpStatus.CONFLICT, "채팅이 열려 있지 않습니다."),
 

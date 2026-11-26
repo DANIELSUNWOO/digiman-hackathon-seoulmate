@@ -33,7 +33,6 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -99,7 +98,8 @@ public class VisitService {
         // visit_reactions 한 테이블에 리액션(emoji 행)과 댓글(comment 행)이 함께 있다
         List<VisitReaction> rows = reactionRepository.findByVisitIdInOrderByIdAsc(visits.stream().map(SpotVisit::getId).toList());
         Map<Long, String> reactionByVisit = new HashMap<>();
-        rows.stream().filter(VisitReaction::isReaction).forEach(r -> reactionByVisit.putIfAbsent(r.getVisitId(), r.getEmoji()));
+        rows.stream().filter(r -> ReactionType.isValid(r.getEmoji()))
+                .forEach(r -> reactionByVisit.putIfAbsent(r.getVisitId(), r.getEmoji()));
         Map<Long, List<CommentView>> commentsByVisit = rows.stream().filter(VisitReaction::isComment)
                 .collect(Collectors.groupingBy(VisitReaction::getVisitId,
                         Collectors.mapping(VisitService::commentView, Collectors.toList())));
@@ -119,12 +119,14 @@ public class VisitService {
     public ReactionResult setReaction(AuthUser me, Long visitId, ReactionRequest req) {
         ReactionType type = ReactionType.from(req.type());
         Target t = writableTarget(me, visitId);
-        Optional<VisitReaction> current = currentReaction(visitId);
-        if (current.isPresent()) {
-            current.get().changeReaction(type.name());
-        } else {
+        List<VisitReaction> current = reactionRows(visitId);
+        if (current.isEmpty()) {
             reactionRepository.save(VisitReaction.reaction(visitId, me.id(), type.name(), now()));
             notificationPublisher.publish(t.match().getTravelerId(), NotificationType.REACTION, t.match().getId());
+        } else {
+            // 첫 행만 남겨 바꾸고, 나머지(이전 버전에서 여러 번 남긴 리액션)는 정리한다
+            current.get(0).changeReaction(type.name());
+            current.subList(1, current.size()).forEach(this::removeReaction);
         }
         return new ReactionResult(visitId, type.name());
     }
@@ -133,7 +135,7 @@ public class VisitService {
     @Transactional
     public void clearReaction(AuthUser me, Long visitId) {
         writableTarget(me, visitId);
-        currentReaction(visitId).ifPresent(reactionRepository::delete);
+        reactionRows(visitId).forEach(this::removeReaction);
     }
 
     /** VISIT-05 댓글. 일본어로 번역하고 여행자에게 REACTION 알림 */
@@ -165,10 +167,20 @@ public class VisitService {
 
     private record Target(SpotVisit visit, Match match) {}
 
-    private Optional<VisitReaction> currentReaction(Long visitId) {
+    /** 리액션이 들어 있는 행들 (보통 1개. 이전 버전 기록이면 여러 개이거나 댓글과 같은 행일 수 있다) */
+    private List<VisitReaction> reactionRows(Long visitId) {
         return reactionRepository.findByVisitIdInOrderByIdAsc(List.of(visitId)).stream()
                 .filter(VisitReaction::isReaction)
-                .findFirst();
+                .toList();
+    }
+
+    /** 리액션만 있는 행은 지우고, 댓글도 있는 행은 리액션 칸만 비워 댓글을 남긴다 */
+    private void removeReaction(VisitReaction r) {
+        if (r.isComment()) {
+            r.clearReaction();
+        } else {
+            reactionRepository.delete(r);
+        }
     }
 
     // ---------- 내부 ----------
@@ -210,6 +222,13 @@ public class VisitService {
     /** 메이트 리액션 3종 (M-23 좋아요·웃음·응원) */
     public enum ReactionType {
         LIKE, LAUGH, CHEER;
+
+        /** LIKE·LAUGH·CHEER 중 하나인지 (이전 버전의 자유 이모지는 목록에서 리액션으로 보여 주지 않는다) */
+        static boolean isValid(String value) {
+            if (value == null) return false;
+            for (ReactionType t : values()) if (t.name().equals(value)) return true;
+            return false;
+        }
 
         static ReactionType from(String value) {
             if (value == null || value.isBlank()) throw new ApiException(ErrorCode.VALIDATION_ERROR);

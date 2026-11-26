@@ -108,7 +108,7 @@ public class MapService {
     /** MAP-04 지도 이름·캡션 수정 */
     @Transactional
     public MapDetail editMap(AuthUser me, Long mapId, MapPatch req) {
-        SecretMap m = ownedMap(me, mapId);
+        SecretMap m = ownedMapForUpdate(me, mapId);   // 캡션 번역 저장과 차례로 처리
         requireNotTraveling(mapId);
         String title = req.title() == null ? null : req.title().trim();
         if (title != null && title.isEmpty()) throw new ApiException(ErrorCode.VALIDATION_ERROR);
@@ -176,7 +176,7 @@ public class MapService {
     /** SPOT-02 스팟 수정 (보낸 값만) */
     @Transactional
     public SpotView editSpot(AuthUser me, Long spotId, SpotPatch req) {
-        Spot s = ownedSpot(me, spotId);
+        Spot s = ownedSpotForUpdate(me, spotId);       // 추천 이유·후기 번역 저장과 차례로 처리
         requireEditableSpot(s);
         checkTag(req.tagId());
         String name = trimOrNull(req.name());
@@ -209,6 +209,18 @@ public class MapService {
         SecretMap m = mapRepository.findById(mapId).orElseThrow(() -> new ApiException(ErrorCode.MAP_NOT_FOUND));
         if (!m.getMateId().equals(me.id())) throw new ApiException(ErrorCode.NOT_MAP_OWNER);
         return m;
+    }
+
+    private SecretMap ownedMapForUpdate(AuthUser me, Long mapId) {
+        SecretMap m = mapRepository.findByIdForUpdate(mapId).orElseThrow(() -> new ApiException(ErrorCode.MAP_NOT_FOUND));
+        if (!m.getMateId().equals(me.id())) throw new ApiException(ErrorCode.NOT_MAP_OWNER);
+        return m;
+    }
+
+    private Spot ownedSpotForUpdate(AuthUser me, Long spotId) {
+        Spot s = spotRepository.findByIdForUpdate(spotId).orElseThrow(() -> new ApiException(ErrorCode.SPOT_NOT_FOUND));
+        ownedMap(me, s.getMapId());
+        return s;
     }
 
     private Spot ownedSpot(AuthUser me, Long spotId) {

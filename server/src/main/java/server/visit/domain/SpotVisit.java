@@ -1,6 +1,7 @@
 package server.visit.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.DynamicUpdate;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,6 +11,7 @@ import java.time.LocalDateTime;
 /** [서버 B 소유] 방문 인증. 여행자 위치(lat/lng)는 저장하지 않는다. */
 @Entity
 @Table(name = "spot_visits")
+@DynamicUpdate   // 바뀐 칸만 UPDATE: 번역 저장과 사용자 수정이 겹쳐도 서로의 값을 덮지 않는다
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SpotVisit {

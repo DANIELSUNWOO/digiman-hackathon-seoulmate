@@ -23,7 +23,9 @@ import server.trip.repository.TripRepository;
 import server.user.domain.Gender;
 import server.user.domain.User;
 import server.user.repository.UserRepository;
+import server.visit.domain.VisitReaction;
 import server.visit.repository.SpotVisitRepository;
+import server.visit.repository.VisitReactionRepository;
 import server.visit.service.VisitService;
 import server.visit.service.VisitService.CommentRequest;
 import server.visit.service.VisitService.ReactionRequest;
@@ -52,6 +54,7 @@ class VisitServiceIntegrationTest {
     @Autowired SecretMapRepository mapRepository;
     @Autowired SpotRepository spotRepository;
     @Autowired SpotVisitRepository visitRepository;
+    @Autowired VisitReactionRepository reactionRepository;
     @Autowired NotificationRepository notificationRepository;
 
     private static final BigDecimal SPOT_LAT = new BigDecimal("37.5447000");
@@ -219,5 +222,34 @@ class VisitServiceIntegrationTest {
         Fixture other = fixture(true);
         assertError(() -> visitService.comment(auth(other.mate()), visitId, new CommentRequest("안녕")), ErrorCode.NOT_MATCH_MEMBER);
         assertError(() -> visitService.setReaction(mate, -1L, new ReactionRequest("LIKE")), ErrorCode.VISIT_NOT_FOUND);
+    }
+
+    @Test
+    void 이전_버전_기록도_댓글은_남기고_리액션은_하나로_정리한다() {
+        Fixture f = fixture(true);
+        Long visitId = visitService.verify(auth(f.traveler()), f.matchId(), near(f.spotIds().get(0))).visitId();
+        AuthUser mate = auth(f.mate());
+        // 이전 버전(v1.6)처럼 이모지+댓글 한 행, 이모지만 한 행을 직접 넣는다
+        VisitReaction mixed = reactionRepository.save(VisitReaction.of(visitId, f.mate().getId(), "❤️", "예전 댓글", now));
+        reactionRepository.save(VisitReaction.of(visitId, f.mate().getId(), "👍", null, now));
+
+        var before = visitService.list(mate, f.matchId()).get(0);
+        assertThat(before.reaction()).isNull();                         // 예전 자유 이모지는 리액션으로 보여 주지 않는다
+        assertThat(before.comments()).extracting(c -> c.content().original()).containsExactly("예전 댓글");
+
+        // 바꾸기: 첫 행만 남아 LIKE 가 되고, 나머지 리액션 행은 정리된다. 댓글은 그대로
+        visitService.setReaction(mate, visitId, new ReactionRequest("LIKE"));
+        var changed = visitService.list(mate, f.matchId()).get(0);
+        assertThat(changed.reaction()).isEqualTo("LIKE");
+        assertThat(changed.comments()).extracting(c -> c.content().original()).containsExactly("예전 댓글");
+        assertThat(reactionRepository.findByVisitIdInOrderByIdAsc(List.of(visitId)))
+                .filteredOn(VisitReaction::isReaction).hasSize(1);
+
+        // 해제: 리액션만 지우고 댓글이 든 행은 남긴다
+        visitService.clearReaction(mate, visitId);
+        var cleared = visitService.list(mate, f.matchId()).get(0);
+        assertThat(cleared.reaction()).isNull();
+        assertThat(cleared.comments()).extracting(c -> c.content().original()).containsExactly("예전 댓글");
+        assertThat(reactionRepository.findById(mixed.getId())).isPresent();
     }
 }

@@ -5,13 +5,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import server.chat.domain.ChatMessage;
 import server.chat.repository.ChatMessageRepository;
 import server.global.event.TranslationTarget;
+import server.global.security.AuthUser;
 import server.map.domain.SecretMap;
 import server.map.domain.Spot;
 import server.map.repository.SecretMapRepository;
 import server.map.repository.SpotRepository;
+import server.map.service.MapService;
+import server.map.service.MapService.SpotPatch;
+import server.user.domain.Role;
 import server.visit.domain.SpotVisit;
 import server.visit.domain.VisitReaction;
 import server.visit.repository.SpotVisitRepository;
@@ -38,6 +45,8 @@ class TranslationIntegrationTest {
     @Autowired SpotVisitRepository visitRepository;
     @Autowired VisitReactionRepository reactionRepository;
     @Autowired ChatMessageRepository messageRepository;
+    @Autowired MapService mapService;
+    @Autowired PlatformTransactionManager txManager;
 
     private final LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
 
@@ -106,5 +115,57 @@ class TranslationIntegrationTest {
         Spot spot = spot();
         realService.translateAsync(TranslationTarget.SPOT_REASON, spot.getId(), "창가 자리가 좋아요", "ko", "ja");
         assertThat(spotRepository.findById(spot.getId()).orElseThrow().getReasonTranslated()).isNull();
+    }
+
+    /** 바깥 트랜잭션이 먼저 읽어 둔 엔티티를, 안쪽 트랜잭션이 먼저 커밋한 뒤에 저장하는 상황을 만든다 */
+    private void interleave(Long spotId, Runnable committedFirst, java.util.function.Consumer<Spot> staleWrite) {
+        TransactionTemplate outer = new TransactionTemplate(txManager);
+        TransactionTemplate inner = new TransactionTemplate(txManager);
+        inner.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        outer.executeWithoutResult(st -> {
+            Spot stale = spotRepository.findById(spotId).orElseThrow();      // 먼저 읽어 둔 값
+            inner.executeWithoutResult(st2 -> committedFirst.run());          // 그 사이 다른 저장이 커밋됨
+            staleWrite.accept(stale);                                         // 옛 엔티티로 한 칸만 바꿔 커밋
+        });
+    }
+
+    @Test
+    void 추천_이유와_후기_번역이_겹쳐도_둘_다_남는다() {
+        Spot spot = spot();
+        interleave(spot.getId(),
+                () -> writer.fill(TranslationTarget.SPOT_REVIEW, spot.getId(), "오전에 한적해요", "[ja] 후기"),
+                stale -> stale.fillReasonTranslation("[ja] 이유"));
+
+        Spot saved = spotRepository.findById(spot.getId()).orElseThrow();
+        assertThat(saved.getReasonTranslated()).isEqualTo("[ja] 이유");
+        assertThat(saved.getReviewTranslated()).isEqualTo("[ja] 후기");
+    }
+
+    @Test
+    void 번역_저장과_스팟_수정이_겹쳐도_수정한_값이_남는다() {
+        Spot spot = spot();
+        AuthUser owner = new AuthUser(mapRepository.findById(spot.getMapId()).orElseThrow().getMateId(), Role.MATE, null);
+        interleave(spot.getId(),
+                () -> mapService.editSpot(owner, spot.getId(),
+                        new SpotPatch("새 이름", "새 주소", null, null, null, null, null, null)),
+                stale -> stale.fillReasonTranslation("[ja] 이유"));
+
+        Spot saved = spotRepository.findById(spot.getId()).orElseThrow();
+        assertThat(saved.getName()).isEqualTo("새 이름");
+        assertThat(saved.getAddress()).isEqualTo("새 주소");
+        assertThat(saved.getReason()).isEqualTo("창가 자리가 좋아요");
+        assertThat(saved.getReasonTranslated()).isEqualTo("[ja] 이유");
+    }
+
+    @Test
+    void 원문을_고친_뒤에_도착한_옛_번역은_버린다() {
+        Spot spot = spot();
+        AuthUser owner = new AuthUser(mapRepository.findById(spot.getMapId()).orElseThrow().getMateId(), Role.MATE, null);
+        mapService.editSpot(owner, spot.getId(), new SpotPatch(null, null, null, null, null, null, "새 추천 이유", null));
+
+        assertThat(writer.fill(TranslationTarget.SPOT_REASON, spot.getId(), "창가 자리가 좋아요", "[ja] 옛 번역")).isFalse();
+        assertThat(spotRepository.findById(spot.getId()).orElseThrow().getReasonTranslated()).isNull();
+        assertThat(writer.fill(TranslationTarget.SPOT_REASON, spot.getId(), "새 추천 이유", "[ja] 새 번역")).isTrue();
+        assertThat(spotRepository.findById(spot.getId()).orElseThrow().getReasonTranslated()).isEqualTo("[ja] 새 번역");
     }
 }

@@ -1,6 +1,6 @@
 # server (Spring Boot)
 
-API 명세서 v1.4 / ERD v2.4 기준. 파트 A(골격·매칭 생애주기·소통) 구현이 들어 있고, 파트 B가 바로 올라탈 수 있게 연동 지점을 열어 두었습니다.
+API 명세서 v1.5 / ERD v2.5 기준. 파트 A(골격·매칭 생애주기·소통) 구현이 들어 있고, 파트 B가 바로 올라탈 수 있게 연동 지점을 열어 두었습니다.
 
 ## 준비물
 - JDK 21, IntelliJ
@@ -72,6 +72,7 @@ cp .env.example .env   # 값 채우기 (DM으로 받기)
 ## 보안 처리 요약
 - Supabase 토큰을 JWKS로 검증 (서명, 만료, iss, aud), 탈퇴 회원의 남은 토큰은 매 요청 차단
 - 모든 테이블 RLS 켬, 허용 정책 없음 → 앱의 공개 키로 DB 직접 조회 불가
+- 차단당한 쪽에는 차단 사실을 드러내지 않음 (ENDED 로만 표시)
 - 매칭 API마다 당사자 검사(403 `NOT_MATCH_MEMBER`), 역할 검사(403 `ROLE_FORBIDDEN`)
 - 매칭 신청 시 앱이 보낸 mateId를 믿지 않고 목록 조건을 서버에서 다시 확인
 - 신고 대상자는 서버가 매칭 상대로 지정, 신고 대상 글이 정말 상대의 글인지 확인
@@ -79,9 +80,8 @@ cp .env.example .env   # 값 채우기 (DM으로 받기)
 - 메이트 정원 10명: 사용자 행 잠금으로 동시 신청해도 11건이 되지 않음 (`MatchApplyIntegrationTest` 에서 5명 동시 신청 검증)
 - 500 응답에 내부 메시지·스택 노출 안 함, DEV API는 `DEMO_MODE=true` 일 때만 존재하고 그때도 로그인 필요
 
-## 명세와 다르게 처리한 것 (팀 확인 필요)
-| # | 내용 | 지금 구현 |
-|---|---|---|
-| 1 | REPORT-01 `PROFILE` 의 targetId = 상대 userId 인데, userId 가 uuid 라 bigint 칼럼에 못 넣음 | PROFILE 은 targetId 를 받지 않아도 되고, 서버가 matchId 를 저장 (대상자는 어차피 매칭 상대) |
-| 2 | 프로필 최초 등록을 두 번 호출 | 409 `PROFILE_ALREADY_REGISTERED` (수정은 USER-04) — 명세에 코드 추가 필요 |
-| 3 | 완료 후 차단 | 허용 (완료 후에도 채팅이 가능하므로) |
+## v1.5 반영 (11/25 회의)
+- 여행자 매칭 칸 무료 5칸 (`users.match_slots` 기본 5, `seoulmate.policy.max-match-slots: 5`)
+- 차단: 채팅 여부와 상관없이 언제든, 양쪽 모두, 사유 필수. 진행 중이면 BLOCKED + 칸 반환, 끝난 매칭이면 차단만 저장
+- 차단당한 쪽: MATCH-02/03 status 가 `ENDED`, CANCELED 알림("매칭이 종료되었습니다"), `feedbackAvailable` + BLOCK-03 피드백 1회
+- REPORT-01 PROFILE 은 target_id = null

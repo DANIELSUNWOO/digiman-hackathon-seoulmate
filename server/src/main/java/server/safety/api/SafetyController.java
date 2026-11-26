@@ -27,10 +27,19 @@ public class SafetyController {
         return Map.of("reportId", safetyService.report(me, req));
     }
 
-    @Operation(summary = "BLOCK-01 차단 (채팅 열린 뒤)")
+    @Operation(summary = "BLOCK-01 차단 (언제든, 사유 필수)")
     @PostMapping("/matches/{matchId}/block")
-    public SafetyService.BlockResponse block(AuthUser me, @PathVariable Long matchId) {
-        return safetyService.block(me, matchId);
+    public SafetyService.BlockResponse block(AuthUser me, @PathVariable Long matchId,
+                                             @Valid @RequestBody SafetyService.BlockRequest req) {
+        return safetyService.block(me, matchId, req);
+    }
+
+    @Operation(summary = "BLOCK-03 차단당한 쪽 피드백 (1회)")
+    @PostMapping("/matches/{matchId}/block-feedback")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SafetyService.FeedbackResponse feedback(AuthUser me, @PathVariable Long matchId,
+                                                   @Valid @RequestBody SafetyService.FeedbackRequest req) {
+        return safetyService.feedback(me, matchId, req.content());
     }
 
     @Operation(summary = "BLOCK-02 내 차단 목록")

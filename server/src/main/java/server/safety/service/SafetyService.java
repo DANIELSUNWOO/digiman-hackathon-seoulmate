@@ -10,6 +10,8 @@ import server.global.error.ErrorCode;
 import server.global.security.AuthUser;
 import server.match.domain.Match;
 import server.match.service.MatchAccess;
+import server.notification.domain.NotificationType;
+import server.notification.service.NotificationPublisher;
 import server.safety.domain.Block;
 import server.safety.domain.Report;
 import server.safety.domain.ReportReason;
@@ -18,6 +20,7 @@ import server.safety.repository.BlockRepository;
 import server.safety.repository.ReportRepository;
 import server.user.repository.UserRepository;
 import server.visit.service.VisitQuery;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +45,7 @@ public class SafetyService {
     private final VisitQuery visitQuery;
     private final ChatMessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final NotificationPublisher notificationPublisher;
     private final Clock clock;
 
     /**
@@ -57,7 +61,7 @@ public class SafetyService {
             throw new ApiException(ErrorCode.DETAIL_REQUIRED);
         }
         if (req.targetType() != ReportTargetType.PROFILE && req.targetId() == null) throw new ApiException(ErrorCode.VALIDATION_ERROR);
-        Long targetId = req.targetType() == ReportTargetType.PROFILE ? m.getId() : req.targetId();
+        Long targetId = req.targetType() == ReportTargetType.PROFILE ? null : req.targetId();   // v1.5: PROFILE 은 null
         if (!isPartnersContent(m, partnerId, req.targetType(), targetId)) {
             throw new ApiException(ErrorCode.INVALID_TARGET);
         }
@@ -74,8 +78,7 @@ public class SafetyService {
 
     private boolean isPartnersContent(Match m, UUID partnerId, ReportTargetType type, Long targetId) {
         return switch (type) {
-            // 명세는 PROFILE 의 targetId = 상대 userId 인데, 사용자 id 가 uuid 로 바뀌어 bigint 칼럼에 못 넣는다.
-            // 대상자는 어차피 서버가 매칭 상대로 정하므로 PROFILE 은 targetId 를 보지 않고 matchId 를 저장한다.
+            // PROFILE: 대상은 매칭 상대 그 자체 (서버가 지정)
             case PROFILE -> true;
             // 방문 기록은 여행자만 쓴다 → 상대가 여행자일 때만 신고 가능
             case VISIT -> visitQuery.authorOf(targetId).map(partnerId::equals).orElse(false)
@@ -89,19 +92,36 @@ public class SafetyService {
     }
 
     /**
-     * BLOCK-01 차단 (채팅이 열린 뒤에만, 그 전에는 신고 — F-22).
-     * 매칭 BLOCKED, 여행자 칸 반환(진행 중 매칭 수에서 빠짐), 이후 서로 추천 제외.
-     * 차단당한 쪽에는 알림을 보내지 않는다.
+     * BLOCK-01 차단 (API v1.5: 채팅 여부와 상관없이 언제든, 여행자·메이트 모두, 사유 필수).
+     * 진행 중이면 매칭 BLOCKED + 여행자 칸 반환, 이미 끝난 매칭이면 차단만 저장. 이후 서로 메이트 찾기에서 제외.
+     * 차단당한 쪽에는 CANCELED("매칭이 종료되었습니다") 알림만 보낸다. 차단 사실은 밝히지 않는다.
      */
     @Transactional
-    public BlockResponse block(AuthUser me, Long matchId) {
+    public BlockResponse block(AuthUser me, Long matchId, BlockRequest req) {
+        if (req.reason() == ReportReason.OTHER && (req.detail() == null || req.detail().isBlank())) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        }
         Match m = matchAccess.memberForUpdate(matchId, me);
         UUID partnerId = m.partnerOf(me.id());
         if (blockRepository.existsByBlockerIdAndBlockedId(me.id(), partnerId)) throw new ApiException(ErrorCode.ALREADY_BLOCKED);
         LocalDateTime now = LocalDateTime.now(clock);
-        m.block(now);
-        blockRepository.save(Block.of(me.id(), partnerId, m.getId(), now));
+        boolean ended = m.blockIfActive(now);
+        blockRepository.save(Block.of(me.id(), partnerId, m.getId(), req.reason(), req.detail(), now));
+        if (ended) notificationPublisher.publish(partnerId, NotificationType.CANCELED, m.getId());
         return new BlockResponse(m.getId(), m.getStatus().name());
+    }
+
+    /** BLOCK-03 차단당한 쪽 피드백 (매칭 1건당 1회, 1~500자) */
+    @Transactional
+    public FeedbackResponse feedback(AuthUser me, Long matchId, String content) {
+        matchAccess.member(matchId, me);
+        Block b = blockRepository.findFirstByMatchIdAndBlockedId(matchId, me.id())
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_BLOCKED_PARTY));
+        if (b.hasFeedback()) throw new ApiException(ErrorCode.FEEDBACK_ALREADY_SUBMITTED);
+        String text = content.strip();
+        if (text.isEmpty() || text.length() > 500) throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        b.writeFeedback(text, LocalDateTime.now(clock));
+        return new FeedbackResponse(matchId, Times.kst(b.getFeedbackAt()));
     }
 
     /** BLOCK-02 내 차단 목록 */
@@ -118,7 +138,13 @@ public class SafetyService {
     public record ReportRequest(@NotNull Long matchId, @NotNull ReportTargetType targetType, Long targetId,
                                 @NotNull ReportReason reason, @Size(max = 1000) String detail) {}
 
+    public record BlockRequest(@NotNull ReportReason reason, @Size(max = 1000) String detail) {}
+
     public record BlockResponse(Long matchId, String status) {}
+
+    public record FeedbackRequest(@NotBlank @Size(max = 500, message = "500자까지 쓸 수 있습니다.") String content) {}
+
+    public record FeedbackResponse(Long matchId, OffsetDateTime feedbackAt) {}
 
     public record BlockedUser(UserSummary user, OffsetDateTime blockedAt) {}
 }

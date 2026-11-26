@@ -1,4 +1,4 @@
--- 서울메이트 ERD v2.4 (Supabase Postgres, 17개 테이블)
+-- 서울메이트 ERD v2.5 (Supabase Postgres, 17개 테이블)
 -- 로그인 정보는 Supabase Auth(auth.users)가 관리한다. users.id = auth.users.id (토큰의 sub)
 -- enum 은 VARCHAR 로 저장하고 값 검사는 서버 코드에서 한다
 -- 모든 테이블에 RLS 를 켜고 허용 정책은 만들지 않는다 → 앱의 공개(anon) 키로는 테이블을 읽을 수 없고,
@@ -15,7 +15,7 @@ CREATE TABLE users (
     profile_image_url VARCHAR(500),
     bio               VARCHAR(200),
     verify_status     VARCHAR(20)  NOT NULL DEFAULT 'NONE',
-    match_slots       INT          NOT NULL DEFAULT 1,
+    match_slots       INT          NOT NULL DEFAULT 5,
     status            VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     terms_agreed_at   TIMESTAMP    NOT NULL,
     created_at        TIMESTAMP    NOT NULL
@@ -170,7 +170,7 @@ CREATE TABLE reports (
     target_user_id UUID        NOT NULL REFERENCES users (id),
     match_id       BIGINT      NOT NULL REFERENCES matches (id),
     target_type    VARCHAR(20) NOT NULL,
-    target_id      BIGINT      NOT NULL,
+    target_id      BIGINT,                      -- PROFILE 은 null (대상은 매칭 상대)
     reason         VARCHAR(30) NOT NULL,
     detail         TEXT,
     status         VARCHAR(20) NOT NULL DEFAULT 'PENDING',
@@ -181,8 +181,12 @@ CREATE TABLE reports (
 CREATE TABLE blocks (
     blocker_id UUID      NOT NULL REFERENCES users (id),
     blocked_id UUID      NOT NULL REFERENCES users (id),
-    match_id   BIGINT REFERENCES matches (id),
-    created_at TIMESTAMP NOT NULL,
+    match_id    BIGINT REFERENCES matches (id),
+    reason      VARCHAR(30) NOT NULL,         -- 신고와 같은 사유 목록
+    detail      TEXT,
+    feedback    TEXT,                         -- 차단당한 쪽 의견 (BLOCK-03, 1회)
+    feedback_at TIMESTAMP,
+    created_at  TIMESTAMP NOT NULL,
     PRIMARY KEY (blocker_id, blocked_id)
 );
 

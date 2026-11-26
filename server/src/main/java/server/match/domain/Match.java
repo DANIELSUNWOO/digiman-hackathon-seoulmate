@@ -111,11 +111,15 @@ public class Match {
         moveTo(MatchStatus.EXPIRED, now, true);
     }
 
-    /** BLOCK-01 차단. 채팅이 열린 뒤에만 (그 전에는 신고, F-22) */
-    public void block(LocalDateTime now) {
-        if (chatStatus != ChatStatus.OPEN) throw new ApiException(ErrorCode.CHAT_NOT_OPEN);
-        if (!status.canMoveTo(MatchStatus.BLOCKED)) throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
+    /**
+     * BLOCK-01 차단 (API v1.5: 채팅 여부와 상관없이 언제든).
+     * 진행 중(MATCHED·ON_COURSE)이면 BLOCKED 로 바꾸고 true (여행자 칸 반환).
+     * 이미 끝난 매칭이면 상태는 그대로 두고 false (차단 관계만 저장).
+     */
+    public boolean blockIfActive(LocalDateTime now) {
+        if (!status.isActive()) return false;
         moveTo(MatchStatus.BLOCKED, now, true);
+        return true;
     }
 
     private void moveTo(MatchStatus next, LocalDateTime now, boolean ends) {

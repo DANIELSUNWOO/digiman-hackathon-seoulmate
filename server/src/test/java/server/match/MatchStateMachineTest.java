@@ -118,24 +118,19 @@ class MatchStateMachineTest {
     }
 
     @Test
-    void 차단은_채팅이_열린_뒤에만_가능하고_이후_쪽지_불가() {
+    void 차단은_채팅_전에도_가능하고_진행_중이면_BLOCKED() {
         Match m = newMatch();
-        m.selectCourse(5L, 3, NOW);
-        assertThatThrownBy(() -> m.block(NOW)).satisfies(t -> assertThat(codeOf(t)).isEqualTo(ErrorCode.CHAT_NOT_OPEN));
-        m.requestChatIfReached(3);
-        m.answerChat(TRAVELER, true);
-        m.answerChat(MATE, true);
-        m.block(NOW);
+        assertThat(m.blockIfActive(NOW)).isTrue();
         assertThat(m.getStatus()).isEqualTo(MatchStatus.BLOCKED);
+        assertThat(m.getEndedAt()).isEqualTo(NOW);
         assertThat(m.canMessage()).isFalse();
     }
 
     @Test
-    void 완료_후에도_채팅과_차단은_가능() {
+    void 이미_끝난_매칭을_차단하면_상태는_그대로() {
         Match m = chatOpen(newMatch());
         m.complete(NOW);
-        assertThat(m.canMessage()).isTrue();
-        m.block(NOW);
-        assertThat(m.getStatus()).isEqualTo(MatchStatus.BLOCKED);
+        assertThat(m.blockIfActive(NOW)).isFalse();
+        assertThat(m.getStatus()).isEqualTo(MatchStatus.COMPLETED);
     }
 }

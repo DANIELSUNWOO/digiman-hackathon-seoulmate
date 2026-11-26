@@ -12,6 +12,8 @@ import server.visit.service.VisitQuery;
 import server.match.domain.Match;
 import server.match.domain.MatchStatus;
 import server.match.repository.MatchRepository;
+import server.safety.domain.Block;
+import server.safety.repository.BlockRepository;
 import server.trip.repository.TripRepository;
 import server.user.domain.User;
 import server.user.repository.UserRepository;
@@ -36,6 +38,7 @@ public class MatchViewAssembler {
     private final SpotVisitRepository visitRepository;
     private final AlbumRepository albumRepository;
     private final MatchRepository matchRepository;
+    private final BlockRepository blockRepository;
     private final Clock clock;
 
     public MatchDtos.MatchItem item(Match m, UUID viewerId) {
@@ -52,7 +55,7 @@ public class MatchViewAssembler {
                 .map(t -> new MatchDtos.TripRange(t.getStartDate(), t.getEndDate())).orElse(null);
         var lastVisit = visitRepository.findFirstByMatchIdOrderByVerifiedAtDesc(m.getId())
                 .map(SpotVisit::getVerifiedAt).orElse(null);
-        return new MatchDtos.MatchItem(m.getId(), m.getStatus().name(), m.getChatStatus().name(),
+        return new MatchDtos.MatchItem(m.getId(), displayStatus(m, viewerId), m.getChatStatus().name(),
                 UserSummary.of(partner, today), courseMap, progress, trip, Times.kst(lastVisit));
     }
 
@@ -65,7 +68,19 @@ public class MatchViewAssembler {
         Long albumId = albumRepository.findByMatchId(m.getId()).map(a -> a.getId()).orElse(null);
         return new MatchDtos.MatchDetail(i.matchId(), i.status(), i.chatStatus(), i.partner(), i.courseMap(),
                 i.progress(), i.trip(), i.lastVisitAt(), chat, Times.kst(m.getMatchedAt()),
-                Times.kst(m.getCourseSelectedAt()), Times.kst(m.getEndedAt()), albumId);
+                Times.kst(m.getCourseSelectedAt()), Times.kst(m.getEndedAt()), albumId,
+                blockedAgainst(m, viewerId).map(b -> !b.hasFeedback()).orElse(false));
+    }
+
+    /** API v1.5: 차단당한 쪽에게는 BLOCKED 대신 ENDED (차단 사실을 드러내지 않음) */
+    private String displayStatus(Match m, UUID viewerId) {
+        if (m.getStatus() == MatchStatus.BLOCKED && blockedAgainst(m, viewerId).isPresent()) return "ENDED";
+        return m.getStatus().name();
+    }
+
+    /** 이 매칭에서 viewer 가 차단당한 기록 */
+    private java.util.Optional<Block> blockedAgainst(Match m, UUID viewerId) {
+        return blockRepository.findFirstByMatchIdAndBlockedId(m.getId(), viewerId);
     }
 
     public MatchDtos.Progress progress(Match m) {

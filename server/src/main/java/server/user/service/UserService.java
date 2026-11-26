@@ -49,7 +49,7 @@ public class UserService {
     public UserDtos.RegisterResponse register(TokenUser token, UserDtos.RegisterRequest req) {
         if (!Boolean.TRUE.equals(req.agreeTerms())) throw new ApiException(ErrorCode.TERMS_NOT_AGREED);
         if (userRepository.existsById(token.id())) throw new ApiException(ErrorCode.USER_ALREADY_REGISTERED);
-        User user = User.register(token.id(), req.country(), policy.freeMatchSlots(), LocalDateTime.now(clock));
+        User user = User.register(token.id(), req.country(), policy.maxMatchSlots(), LocalDateTime.now(clock));
         try {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {        // 앱이 두 번 연속 호출한 경우

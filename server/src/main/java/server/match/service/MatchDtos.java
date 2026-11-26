@@ -40,7 +40,7 @@ public final class MatchDtos {
     public record MatchDetail(Long matchId, String status, String chatStatus, UserSummary partner,
                               CourseMap courseMap, Progress progress, TripRange trip, OffsetDateTime lastVisitAt,
                               Chat chat, OffsetDateTime matchedAt, OffsetDateTime courseSelectedAt,
-                              OffsetDateTime endedAt, Long albumId) {}
+                              OffsetDateTime endedAt, Long albumId, boolean feedbackAvailable) {}
 
     /** MATCH-04 메이트 지도 (공개 스팟 2곳만 내용 포함) */
     public record MateMap(Long mapId, String title, LocalizedText caption, long spotCount, List<SpotView> previewSpots) {}

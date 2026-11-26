@@ -11,7 +11,7 @@ public record PolicyProperties(
         int mapPreviewSpots,
         double chatUnlockRatio,
         int visitRadiusMeters,
-        int freeMatchSlots,
+        int maxMatchSlots,
         int maxTags,
         int minAge
 ) {

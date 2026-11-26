@@ -62,6 +62,8 @@ public enum ErrorCode {
     DETAIL_REQUIRED(HttpStatus.BAD_REQUEST, "기타 사유는 상세 내용이 필요합니다."),
     ALREADY_REPORTED(HttpStatus.CONFLICT, "이미 신고한 상대입니다."),
     ALREADY_BLOCKED(HttpStatus.CONFLICT, "이미 차단한 상대입니다."),
+    NOT_BLOCKED_PARTY(HttpStatus.FORBIDDEN, "이 매칭에서 차단당한 사람이 아닙니다."),
+    FEEDBACK_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "이미 의견을 남겼습니다."),
 
     // 알림
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다.");

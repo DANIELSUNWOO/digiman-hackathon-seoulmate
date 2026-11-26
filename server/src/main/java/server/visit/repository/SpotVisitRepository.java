@@ -14,4 +14,6 @@ public interface SpotVisitRepository extends JpaRepository<SpotVisit, Long> {
     Optional<SpotVisit> findFirstByMatchIdOrderByVerifiedAtDesc(Long matchId);
     boolean existsBySpotId(Long spotId);
     boolean existsBySpotIdIn(Collection<Long> spotIds);
+    boolean existsByMatchIdAndSpotId(Long matchId, Long spotId);
+    List<SpotVisit> findByMatchIdOrderByVerifiedAtDescIdDesc(Long matchId);
 }

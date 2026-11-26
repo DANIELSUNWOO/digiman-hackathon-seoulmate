@@ -71,6 +71,9 @@ public enum ErrorCode {
     // 방문 인증 (서버 B)
     LOCATION_REQUIRED(HttpStatus.BAD_REQUEST, "위치 정보가 필요합니다."),
     OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "스팟 근처(200m 이내)에서 다시 시도해 주세요."),
+    SPOT_NOT_IN_COURSE(HttpStatus.BAD_REQUEST, "이번 여행 코스의 스팟이 아닙니다."),
+    ALREADY_VISITED(HttpStatus.CONFLICT, "이미 인증한 스팟입니다."),
+    VISIT_NOT_FOUND(HttpStatus.NOT_FOUND, "방문 기록을 찾을 수 없습니다."),
 
     // 비밀지도·스팟 (서버 B)
     MAP_NOT_FOUND(HttpStatus.NOT_FOUND, "지도를 찾을 수 없습니다."),

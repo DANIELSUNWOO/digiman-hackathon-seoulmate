@@ -66,7 +66,11 @@ public enum ErrorCode {
     FEEDBACK_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "이미 의견을 남겼습니다."),
 
     // 알림
-    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다.");
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+
+    // 방문 인증 (서버 B)
+    LOCATION_REQUIRED(HttpStatus.BAD_REQUEST, "위치 정보가 필요합니다."),
+    OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "스팟 근처(200m 이내)에서 다시 시도해 주세요.");
 
     private final HttpStatus status;
     private final String message;

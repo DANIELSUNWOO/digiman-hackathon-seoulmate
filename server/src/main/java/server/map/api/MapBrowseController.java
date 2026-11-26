@@ -1,33 +1,39 @@
-package server.mate.api;
+package server.map.api;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import server.global.common.Guards;
 import server.global.security.AuthUser;
-import server.mate.service.MateSearchService;
+import server.map.service.MapBrowseService;
 
-@Tag(name = "매칭")
+@Tag(name = "지도 고르기 (여행자)")
 @RestController
-@RequestMapping("/api/v1/mates")
 @RequiredArgsConstructor
-public class MateController {
+public class MapBrowseController {
 
-    private final MateSearchService mateSearchService;
+    private final MapBrowseService mapBrowseService;
 
-    @Operation(summary = "MATE-01 메이트 찾기 (목록 + 정렬·필터). sort = TASTE(기본) / PINS / RECENT / POPULAR, maxPins 생략 = 상한 없음")
-    @GetMapping
-    public MateSearchService.MateListResponse search(AuthUser me,
+    @Operation(summary = "MAP-07 지도 고르기 (카드 1장 = 지도 1개). sort 생략 = 추천순 / PINS_ASC / PINS_DESC / RECENT / POPULAR, maxPins 생략 = 상한 없음")
+    @GetMapping("/api/v1/maps")
+    public MapBrowseService.MapBrowseResponse browse(AuthUser me,
                                                      @RequestParam(required = false) String sort,
                                                      @RequestParam(required = false) Integer minPins,
                                                      @RequestParam(required = false) Integer maxPins,
                                                      @RequestParam(required = false) Integer page,
                                                      @RequestParam(required = false) Integer size) {
         Guards.requireTraveler(me);
-        return mateSearchService.search(me.id(), sort, minPins, maxPins, page, size);
+        return mapBrowseService.browse(me.id(), sort, minPins, maxPins, page, size);
+    }
+
+    @Operation(summary = "MAP-08 공개 스팟 미리보기 (매칭 전, 숨긴 스팟은 개수만)")
+    @GetMapping("/api/v1/maps/{mapId}/preview")
+    public MapBrowseService.MapPreview preview(AuthUser me, @PathVariable Long mapId) {
+        Guards.requireTraveler(me);
+        return mapBrowseService.preview(me.id(), mapId);
     }
 }

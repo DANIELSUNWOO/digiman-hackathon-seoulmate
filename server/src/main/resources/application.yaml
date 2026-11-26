@@ -1,3 +1,47 @@
+# 비밀 값은 여기 쓰지 않는다. server/.env (커밋 금지) 또는 배포 환경변수로 넣는다.
 spring:
   application:
     name: server
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5        # Supabase Session pooler 연결 수 제한
+  jpa:
+    hibernate:
+      ddl-auto: validate          # 스키마는 Flyway(db/migration)가 관리. 엔티티와 DB가 다르면 서버가 안 뜬다
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc.time_zone: Asia/Seoul
+        default_batch_fetch_size: 100
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+seoulmate:
+  demo-mode: ${DEMO_MODE:false}
+  supabase:
+    issuer: ${SUPABASE_JWT_ISSUER}
+    jwks-url: ${SUPABASE_JWKS_URL}
+  policy:
+    mate-list-page-size: 20
+    mate-max-active-matches: 10
+    map-min-spots: 5
+    map-preview-spots: 2
+    chat-unlock-ratio: 0.5
+    visit-radius-meters: 200
+    max-match-slots: 5          # 여행자 무료 매칭 칸 (ERD v2.5)
+    max-tags: 10
+    min-age: 18

@@ -15,7 +15,7 @@ import server.visit.repository.VisitReactionRepository;
  * 다른 저장과 겹쳐도 값이 사라지지 않게 하는 장치:
  * - 지도·스팟·방문·댓글 엔티티는 @DynamicUpdate 라서 번역 칸 하나만 UPDATE 된다
  *   (추천 이유 번역과 후기 번역이 동시에 저장되거나, 번역 저장과 이름·주소 수정이 겹쳐도 서로 덮지 않는다)
- * - 수정할 수 있는 글(캡션, 추천 이유, 후기)은 행을 잠그고 원문이 같을 때만 채운다.
+ * - 수정할 수 있는 글(지도 제목, 캡션, 추천 이유, 후기)은 행을 잠그고 원문이 같을 때만 채운다.
  *   스팟·지도 수정(MapService)도 같은 행을 잠그므로, 원문이 바뀐 뒤 옛 번역이 들어가는 일이 없다
  * - 쪽지는 서버 A 엔티티라 번역 칸만 바꾸는 UPDATE 쿼리를 쓴다 (쪽지 원문은 수정되지 않는다)
  */
@@ -33,6 +33,9 @@ public class TranslationWriter {
     @Transactional
     public boolean fill(TranslationTarget target, Long id, String original, String translated) {
         return switch (target) {
+            case MAP_TITLE -> mapRepository.findByIdForUpdate(id)
+                    .filter(m -> original.equals(m.getTitle()) && translated.length() <= 100)   // 칸 길이 100
+                    .map(m -> { m.fillTitleTranslation(translated); return true; }).orElse(false);
             case MAP_CAPTION -> mapRepository.findByIdForUpdate(id)
                     .filter(m -> original.equals(m.getCaption()))
                     .map(m -> { m.fillTranslation(translated); return true; }).orElse(false);

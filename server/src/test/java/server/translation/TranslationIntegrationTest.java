@@ -79,6 +79,7 @@ class TranslationIntegrationTest {
         ChatMessage message = messageRepository.save(ChatMessage.of(1L, UUID.randomUUID(), "안녕하세요", now));
 
         LlmTranslationService service = service(false);
+        service.translateAsync(TranslationTarget.MAP_TITLE, spot.getMapId(), "지도", "ko", "ja");
         service.translateAsync(TranslationTarget.MAP_CAPTION, spot.getMapId(), "조용한 카페 모음", "ko", "ja");
         service.translateAsync(TranslationTarget.SPOT_REASON, spot.getId(), "창가 자리가 좋아요", "ko", "ja");
         service.translateAsync(TranslationTarget.SPOT_REVIEW, spot.getId(), "오전에 한적해요", "ko", "ja");
@@ -86,6 +87,7 @@ class TranslationIntegrationTest {
         service.translateAsync(TranslationTarget.REACTION_COMMENT, comment.getId(), "거기 최고죠", "ko", "ja");
         service.translateAsync(TranslationTarget.CHAT_MESSAGE, message.getId(), "안녕하세요", "ko", "ja");
 
+        assertThat(mapRepository.findById(spot.getMapId()).orElseThrow().getTitleTranslated()).isEqualTo("[ja] 지도");
         assertThat(mapRepository.findById(spot.getMapId()).orElseThrow().getCaptionTranslated()).isEqualTo("[ja] 조용한 카페 모음");
         Spot saved = spotRepository.findById(spot.getId()).orElseThrow();
         assertThat(saved.getReasonTranslated()).isEqualTo("[ja] 창가 자리가 좋아요");
@@ -167,5 +169,20 @@ class TranslationIntegrationTest {
         assertThat(spotRepository.findById(spot.getId()).orElseThrow().getReasonTranslated()).isNull();
         assertThat(writer.fill(TranslationTarget.SPOT_REASON, spot.getId(), "새 추천 이유", "[ja] 새 번역")).isTrue();
         assertThat(spotRepository.findById(spot.getId()).orElseThrow().getReasonTranslated()).isEqualTo("[ja] 새 번역");
+    }
+
+    @Test
+    void 지도_제목을_바꾸면_제목_번역을_비우고_새_제목만_받는다() {
+        Spot spot = spot();
+        Long mapId = spot.getMapId();
+        AuthUser owner = new AuthUser(mapRepository.findById(mapId).orElseThrow().getMateId(), Role.MATE, null);
+        assertThat(writer.fill(TranslationTarget.MAP_TITLE, mapId, "지도", "[ja] 지도")).isTrue();
+
+        mapService.editMap(owner, mapId, new MapService.MapPatch("새 지도", null));
+        assertThat(mapRepository.findById(mapId).orElseThrow().getTitleTranslated()).isNull();
+        assertThat(writer.fill(TranslationTarget.MAP_TITLE, mapId, "지도", "[ja] 옛 제목")).isFalse();
+        assertThat(writer.fill(TranslationTarget.MAP_TITLE, mapId, "새 지도", "x".repeat(101))).isFalse();   // 칸보다 길면 버림
+        assertThat(writer.fill(TranslationTarget.MAP_TITLE, mapId, "새 지도", "[ja] 新しい地図")).isTrue();
+        assertThat(mapRepository.findById(mapId).orElseThrow().getTitleTranslated()).isEqualTo("[ja] 新しい地図");
     }
 }

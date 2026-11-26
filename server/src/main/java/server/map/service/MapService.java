@@ -74,6 +74,7 @@ public class MapService {
         User mate = userRepository.findById(me.id()).orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_REGISTERED));
         if (!mate.isVerified()) throw new ApiException(ErrorCode.NOT_VERIFIED);
         SecretMap map = mapRepository.save(SecretMap.of(me.id(), req.title().trim(), blankToNull(req.caption()), now()));
+        translate(TranslationTarget.MAP_TITLE, map.getId(), map.getTitle());
         translate(TranslationTarget.MAP_CAPTION, map.getId(), map.getCaption());
         return new MapCreated(map.getId());
     }
@@ -112,8 +113,10 @@ public class MapService {
         requireNotTraveling(mapId);
         String title = req.title() == null ? null : req.title().trim();
         if (title != null && title.isEmpty()) throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        boolean titleChanged = title != null && !title.equals(m.getTitle());
         m.edit(title, req.caption());
         m.touch(now());
+        if (titleChanged) translate(TranslationTarget.MAP_TITLE, m.getId(), m.getTitle());
         if (req.caption() != null) translate(TranslationTarget.MAP_CAPTION, m.getId(), m.getCaption());
         return detail(me, mapId);
     }

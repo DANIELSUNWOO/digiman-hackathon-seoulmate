@@ -43,6 +43,14 @@ export default function Auth() {
       {!ko && <Button label="LINEで続ける" secondary disabled />}
       <Button label={ko ? "이메일로 시작하기" : "メールで始める"} disabled />
       <Label center>{ko ? "인증은 준비 중입니다" : "認証は準備中です"}</Label>
+      {__DEV__ && (
+        <Button
+          label="[DEV] 지도 검증"
+          language="ko"
+          secondary
+          onPress={() => router.push("/dev/map")}
+        />
+      )}
     </Screen>
   );
 }

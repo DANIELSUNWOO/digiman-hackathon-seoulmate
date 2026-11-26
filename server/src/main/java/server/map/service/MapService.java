@@ -47,6 +47,7 @@ public class MapService {
     static final String MAP_LANG = "ko";
     static final String READER_LANG = "ja";
     private static final int MAX_PHOTOS = 5;
+    private static final int MAX_URL_LENGTH = 500;
 
     private final SecretMapRepository mapRepository;
     private final SpotRepository spotRepository;
@@ -162,7 +163,9 @@ public class MapService {
     public SpotView editSpot(AuthUser me, Long spotId, SpotPatch req) {
         Spot s = ownedSpot(me, spotId);
         checkTag(req.tagId());
-        s.edit(trimOrNull(req.name()), req.address(), req.lat(), req.lng(), req.tagId(), req.reason(), req.review());
+        String name = trimOrNull(req.name());
+        if (name != null && name.isEmpty()) throw new ApiException(ErrorCode.VALIDATION_ERROR);   // 공백만 보낸 이름
+        s.edit(name, req.address(), req.lat(), req.lng(), req.tagId(), req.reason(), req.review());
         if (req.photoUrls() != null) {
             List<String> photos = photos(req.photoUrls());
             if (photos.isEmpty()) throw new ApiException(ErrorCode.PHOTO_REQUIRED);
@@ -213,7 +216,9 @@ public class MapService {
     private static List<String> photos(List<String> urls) {
         List<String> clean = urls == null ? List.of()
                 : urls.stream().filter(u -> u != null && !u.isBlank()).map(String::trim).toList();
-        if (clean.size() > MAX_PHOTOS) throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        if (clean.size() > MAX_PHOTOS || clean.stream().anyMatch(u -> u.length() > MAX_URL_LENGTH)) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR);   // DB 칸(500자)보다 길면 저장 전에 400
+        }
         return clean;
     }
 

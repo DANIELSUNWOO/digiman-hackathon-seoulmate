@@ -136,4 +136,14 @@ class MateSearchIntegrationTest {
         assertThatThrownBy(() -> mateSearchService.search(t.getId(), null, 3, null, null, null))
                 .satisfies(e -> assertThat(((ApiException) e).getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
     }
+
+    @Test
+    void 페이지_값이_잘못되면_후보가_없어도_400() {
+        User t = traveler();
+        for (Integer[] ps : new Integer[][]{{-1, 20}, {0, 0}}) {
+            assertThatThrownBy(() -> mateSearchService.search(t.getId(), null, null, null, ps[0], ps[1]))
+                    .isInstanceOf(ApiException.class)
+                    .extracting(e -> ((ApiException) e).getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+        }
+    }
 }

@@ -73,6 +73,9 @@ public class MateSearchService {
         MateRanking.validatePinRange(minPins, maxPins, policy.mapMinSpots());
         int pageNo = page == null ? 0 : page;
         int pageSize = size == null ? policy.mateListPageSize() : Math.min(size, MAX_PAGE_SIZE);
+        if (pageNo < 0 || pageSize <= 0) {              // 후보가 없을 때도 같은 기준으로 먼저 검사
+            throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        }
 
         LocalDate today = LocalDate.now(clock);
         User traveler = userRepository.findById(travelerId)

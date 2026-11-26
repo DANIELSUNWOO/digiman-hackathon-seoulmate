@@ -236,4 +236,19 @@ class MapServiceIntegrationTest {
         assertThat(spotRepository.countByMapId(mapId)).isZero();
         assertThat(mapService.myMaps(me)).isEmpty();
     }
+
+    @Test
+    void 공백_이름과_너무_긴_사진_주소는_400() {
+        AuthUser me = auth(user("KR", true));
+        Long mapId = mapService.createMap(me, new MapRequest("지도", null)).mapId();
+        Long spotId = mapWithSpots(me, mapId, 1).get(0);
+        String longUrl = "https://img/" + "a".repeat(489);   // 501자
+
+        assertError(() -> mapService.editSpot(me, spotId,
+                new SpotPatch("   ", null, null, null, null, null, null, null)), ErrorCode.VALIDATION_ERROR);
+        assertError(() -> mapService.addSpot(me, mapId, spot("긴주소", List.of(longUrl))), ErrorCode.VALIDATION_ERROR);
+        assertError(() -> mapService.editSpot(me, spotId,
+                new SpotPatch(null, null, null, null, null, List.of(longUrl), null, null)), ErrorCode.VALIDATION_ERROR);
+        assertThat(mapService.detail(me, mapId).spots().get(0).name()).isEqualTo("스팟0");
+    }
 }

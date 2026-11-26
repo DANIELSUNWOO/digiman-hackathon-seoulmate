@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text } from "react-native";
 import { theme } from "../src/theme";
 import { useRole } from "../src/state";
 import { useSession } from "../src/session";
-import { nextStep } from "../src/users";
+import { nextStep, onboardingRouteFor } from "../src/users";
 export default function Splash() {
   const { ready: roleReady } = useRole();
   const { session, ready, load, busy } = useSession();
@@ -16,8 +16,8 @@ export default function Splash() {
   useEffect(() => {
     if (!elapsed || !roleReady || !ready || busy) return;
     if (!session) router.replace("/country");
-    else if (load.kind === "ready" && !nextStep(load.me))
-      router.replace("/(tabs)");
+    else if (load.kind === "ready")
+      router.replace(onboardingRouteFor(nextStep(load.me)));
     else if (load.kind !== "loading") router.replace("/account");
   }, [elapsed, roleReady, ready, session, load, busy]);
   return (

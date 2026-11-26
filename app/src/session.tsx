@@ -6,6 +6,7 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { AuthFlow, type FlowState } from "./authFlow";
+import { syncDraftAccount } from "./features/onboarding/draftStore";
 import { getMe, registerUser } from "./users";
 import { supabase } from "./supabase";
 
@@ -48,6 +49,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     flow?.snapshot ?? getEmpty,
     getServerSnapshot,
   );
+  useEffect(() => {
+    syncDraftAccount(state.session?.user.id ?? null);
+  }, [state.session?.user.id]);
   useEffect(() => {
     if (!supabase || !flow) return;
     flow.activate();

@@ -5,7 +5,7 @@ import { House, MapTrifold, User } from "phosphor-react-native";
 import { useRole } from "../../src/state";
 import { useSession } from "../../src/session";
 import { theme } from "../../src/theme";
-import { nextStep } from "../../src/users";
+import { nextStep, onboardingRouteFor } from "../../src/users";
 export default function TabsLayout() {
   const { ready: roleReady, syncServerRole } = useRole();
   const { session, ready: sessionReady, load, busy } = useSession();
@@ -16,8 +16,9 @@ export default function TabsLayout() {
   if (!roleReady || !sessionReady) return null;
   if (!session) return <Redirect href="/auth" />;
   if (busy || load.kind === "loading") return null;
-  if (load.kind !== "ready" || nextStep(load.me))
-    return <Redirect href="/account" />;
+  if (load.kind !== "ready") return <Redirect href="/account" />;
+  const step = nextStep(load.me);
+  if (step) return <Redirect href={onboardingRouteFor(step)} />;
   const ko = load.me.language === "ko";
   return (
     <Tabs

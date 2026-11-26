@@ -137,8 +137,11 @@ export function Card({
     </Pressable>
   );
 }
-export function Input(props: TextInputProps) {
-  const fontFamily = useFontFamily("regular");
+export function Input({
+  language,
+  ...props
+}: TextInputProps & { language?: "ko" | "ja" }) {
+  const fontFamily = useFontFamily("regular", language);
   return (
     <TextInput
       placeholderTextColor={t.color.placeholder}

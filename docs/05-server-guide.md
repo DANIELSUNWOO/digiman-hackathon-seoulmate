@@ -27,7 +27,7 @@
 | 화면 | 호출 |
 |---|---|
 | T-04 프로필 | `PUT /users/me/profile` (닉네임 2~8자) |
-| T-05 취향 | `GET /tags` → `PUT /users/me/tags` (대분류당 2개) |
+| T-05 취향 | `GET /tags` → `PUT /users/me/tags` (분류당 2개, 전체 14개). 분류의 `category` 가 `AREA` 면 여행자 화면에서는 숨긴다 |
 | T-06 매칭 조건 | `PUT /users/me/match-preferences` |
 | T-07 일정 | `POST /trips` `{startDate, endDate}` |
 | T-11 지도 고르기 | `GET /maps` (정렬·핀 필터, `emptyReason` 으로 빈 화면 2종) |
@@ -47,7 +47,7 @@
 
 | 화면 | 호출 |
 |---|---|
-| M-03·04 프로필·취향 | 여행자와 같음 |
+| M-03·04 프로필·취향 | 여행자와 같음. 메이트는 `AREA`(잘 아는 동네)까지 보여 준다 |
 | M-10~14 지도 만들기 | `POST /maps` → `POST /maps/{id}/spots` (5곳 이상) → `PUT /maps/{id}/previews` (정확히 2곳) |
 | M-20 홈 | `GET /matches?state=active` → 개수가 "함께 여행 중 n / 10" |
 | M-15 지도별 대화 목록 | **`GET /matches?mapId={mapId}`** (`chatStatus` 가 OPEN 이 아니면 잠금 표시) |

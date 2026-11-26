@@ -21,13 +21,17 @@ public class TagService {
     private final UserTagRepository userTagRepository;
     private final PolicyProperties policy;
 
-    /** TAG-01 대분류 → 세부 트리, 요청한 사람 언어로 */
+    /**
+     * TAG-01 대분류 → 세부 트리, 요청한 사람 언어로.
+     * category(FOOD·WALK·CULTURE·SHOP·SPORTS·WELLNESS·AREA)로 앱이 분류를 구분한다.
+     * AREA(동네)는 메이트 M-04 전용이라 여행자 T-05 에서는 앱이 숨긴다.
+     */
     @Transactional(readOnly = true)
     public List<TagTree> tree(String language) {
         Map<Long, TagTree> roots = new LinkedHashMap<>();
         List<Tag> all = tagRepository.findAllByOrderByDepthAscIdAsc();
         for (Tag t : all) {
-            if (t.getDepth() == 1) roots.put(t.getId(), new TagTree(t.getId(), t.nameIn(language), new ArrayList<>()));
+            if (t.getDepth() == 1) roots.put(t.getId(), new TagTree(t.getId(), t.getCategory(), t.nameIn(language), new ArrayList<>()));
         }
         for (Tag t : all) {
             if (t.getDepth() == 2 && roots.containsKey(t.getParentId())) {
@@ -65,13 +69,13 @@ public class TagService {
         return tagRepository.findAllById(ids).stream().map(t -> TagView.of(t, language)).toList();
     }
 
-    public record TagView(Long tagId, String name, Long parentId) {
+    public record TagView(Long tagId, String category, String name, Long parentId) {
         public static TagView of(Tag t, String language) {
-            return new TagView(t.getId(), t.nameIn(language), t.getParentId());
+            return new TagView(t.getId(), t.getCategory(), t.nameIn(language), t.getParentId());
         }
     }
 
-    public record TagTree(Long tagId, String name, List<Child> children) {
+    public record TagTree(Long tagId, String category, String name, List<Child> children) {
         public record Child(Long tagId, String name) {}
     }
 }

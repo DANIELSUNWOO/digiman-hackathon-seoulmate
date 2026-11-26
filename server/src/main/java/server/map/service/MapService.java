@@ -16,6 +16,7 @@ import server.global.event.TranslationTarget;
 import server.global.security.AuthUser;
 import server.map.domain.SecretMap;
 import server.map.domain.Spot;
+import server.map.repository.MapBrowseQueries;
 import server.map.repository.SecretMapRepository;
 import server.map.repository.SpotRepository;
 import server.match.domain.MatchStatus;
@@ -30,15 +31,19 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * [서버 B] 비밀지도·스팟 (MAP-01~06, SPOT-01~03, F-10~F-14).
  * - 메이트가 쓴 글(캡션·추천 이유·후기)은 한국어 원문으로 저장하고 일본어 번역을 비동기로 채운다
  * - 지도나 스팟이 바뀌면 지도의 updated_at 을 갱신한다 ("최근 업데이트 순" 정렬)
- * - 진행 중인 매칭의 코스 지도이거나 방문 기록이 있으면 삭제 불가 (409 MAP_IN_USE)
+ * - 한 번이라도 코스로 쓰였거나 방문 기록이 있는 지도는 삭제 불가 (409 MAP_IN_USE)
+ * - 지도 수정 잠금 (v1.7): 여행 중인 여행자가 있으면 기존 스팟·지도 이름·공개 스팟 지정 불가(MAP_LOCKED), 새 스팟 추가만 허용.
+ *   여행자가 없어도 공개 스팟은 수정·삭제 불가(PREVIEW_SPOT_LOCKED) → 다른 곳을 공개로 바꾼 뒤 수정
  */
 @Service
 @RequiredArgsConstructor
@@ -46,7 +51,7 @@ public class MapService {
 
     static final String MAP_LANG = "ko";
     static final String READER_LANG = "ja";
-    private static final int MAX_PHOTOS = 5;
+    private static final int MAX_PHOTOS = 3;   // 화면 명세 v9 M-13 "사진 최대 3장"
     private static final int MAX_URL_LENGTH = 500;
 
     private final SecretMapRepository mapRepository;
@@ -58,6 +63,7 @@ public class MapService {
     private final MapVisibility mapVisibility;
     private final PolicyProperties policy;
     private final TranslationService translationService;
+    private final MapBrowseQueries browseQueries;
     private final Clock clock;
 
     // ---------- 지도 ----------
@@ -75,11 +81,18 @@ public class MapService {
     /** MAP-02 내 지도 목록 */
     @Transactional(readOnly = true)
     public List<MyMap> myMaps(AuthUser me) {
-        return mapRepository.findByMateIdOrderByIdAsc(me.id()).stream().map(m -> {
+        List<SecretMap> maps = mapRepository.findByMateIdOrderByIdAsc(me.id());
+        if (maps.isEmpty()) return List.of();
+        List<Long> mapIds = maps.stream().map(SecretMap::getId).toList();
+        Map<Long, Long> selected = countByMap(browseQueries.countMatchesByMap(mapIds, EnumSet.allOf(MatchStatus.class)));
+        Map<Long, Long> traveling = countByMap(browseQueries.countMatchesByMap(mapIds, MatchStatus.ACTIVE));
+        return maps.stream().map(m -> {
             long spots = spotRepository.countByMapId(m.getId());
             long previews = spotRepository.countByMapIdAndPreviewTrue(m.getId());
+            long travelingCount = traveling.getOrDefault(m.getId(), 0L);
             return new MyMap(m.getId(), m.getTitle(), caption(m), spots, previews,
-                    mapVisibility.isPublic(spots, previews), inUse(m.getId()));
+                    mapVisibility.isPublic(spots, previews), travelingCount > 0,
+                    selected.getOrDefault(m.getId(), 0L), travelingCount);
         }).toList();
     }
 
@@ -96,6 +109,7 @@ public class MapService {
     @Transactional
     public MapDetail editMap(AuthUser me, Long mapId, MapPatch req) {
         SecretMap m = ownedMap(me, mapId);
+        requireNotTraveling(mapId);
         String title = req.title() == null ? null : req.title().trim();
         if (title != null && title.isEmpty()) throw new ApiException(ErrorCode.VALIDATION_ERROR);
         m.edit(title, req.caption());
@@ -121,6 +135,7 @@ public class MapService {
     @Transactional
     public PreviewResult setPreviews(AuthUser me, Long mapId, List<Long> spotIds) {
         SecretMap m = ownedMap(me, mapId);
+        requireNotTraveling(mapId);
         Set<Long> chosen = new LinkedHashSet<>(spotIds == null ? List.of() : spotIds);
         if (chosen.size() != policy.mapPreviewSpots()) throw new ApiException(ErrorCode.PREVIEW_COUNT_INVALID);
 
@@ -162,6 +177,7 @@ public class MapService {
     @Transactional
     public SpotView editSpot(AuthUser me, Long spotId, SpotPatch req) {
         Spot s = ownedSpot(me, spotId);
+        requireEditableSpot(s);
         checkTag(req.tagId());
         String name = trimOrNull(req.name());
         if (name != null && name.isEmpty()) throw new ApiException(ErrorCode.VALIDATION_ERROR);   // 공백만 보낸 이름
@@ -177,11 +193,12 @@ public class MapService {
         return view(s);
     }
 
-    /** SPOT-03 스팟 삭제. 공개 스팟을 지우면 다시 지정할 때까지 지도는 비공개가 된다 */
+    /** SPOT-03 스팟 삭제. 공개 스팟은 지울 수 없다 (다른 곳을 공개로 바꾼 뒤 삭제) */
     @Transactional
     public void deleteSpot(AuthUser me, Long spotId) {
         Spot s = ownedSpot(me, spotId);
-        if (inUse(s.getMapId()) || visitRepository.existsBySpotId(spotId)) throw new ApiException(ErrorCode.MAP_IN_USE);
+        requireEditableSpot(s);
+        if (visitRepository.existsBySpotId(spotId)) throw new ApiException(ErrorCode.MAP_IN_USE);   // 방문 기록 보존
         spotRepository.delete(s);
         mapRepository.findById(s.getMapId()).ifPresent(m -> m.touch(now()));
     }
@@ -202,6 +219,26 @@ public class MapService {
 
     private boolean inUse(Long mapId) {
         return matchRepository.existsByCourseMapIdAndStatusIn(mapId, MatchStatus.ACTIVE);
+    }
+
+    /**
+     * 지도 수정 잠금 (API v1.7, 화면 명세 v9 M-10a):
+     * 여행 중인 여행자가 있으면 기존 스팟·지도 이름·공개 스팟 지정을 바꿀 수 없다 (새 스팟 추가만 허용).
+     */
+    private void requireNotTraveling(Long mapId) {
+        if (inUse(mapId)) throw new ApiException(ErrorCode.MAP_LOCKED);
+    }
+
+    /** 스팟 수정·삭제: 여행 중이면 MAP_LOCKED, 공개 스팟이면 PREVIEW_SPOT_LOCKED (다른 곳을 공개로 바꾼 뒤 수정) */
+    private void requireEditableSpot(Spot s) {
+        requireNotTraveling(s.getMapId());
+        if (s.isPreview()) throw new ApiException(ErrorCode.PREVIEW_SPOT_LOCKED);
+    }
+
+    private static Map<Long, Long> countByMap(List<Object[]> rows) {
+        Map<Long, Long> map = new HashMap<>();
+        for (Object[] row : rows) map.put((Long) row[0], ((Number) row[1]).longValue());
+        return map;
     }
 
     /** 끝난 매칭(취소·만료 포함)도 matches.course_map_id 로 지도를 참조하므로, 한 번이라도 코스로 쓰인 지도는 지우지 않는다 */
@@ -278,7 +315,7 @@ public class MapService {
     public record MapCreated(Long mapId) {}
 
     public record MyMap(Long mapId, String title, LocalizedText caption, long spotCount, long previewCount,
-                        boolean isPublic, boolean inUse) {}
+                        boolean isPublic, boolean inUse, long selectedCount, long travelingCount) {}
 
     public record MapDetail(Long mapId, String title, LocalizedText caption, boolean isPublic, List<SpotView> spots) {}
 

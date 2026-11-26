@@ -11,6 +11,7 @@ import server.map.domain.Spot;
 import server.map.repository.SecretMapRepository;
 import server.map.repository.SpotRepository;
 import server.map.service.MapService;
+import server.map.service.MapService.MapPatch;
 import server.map.service.MapService.MapRequest;
 import server.map.service.MapService.SpotPatch;
 import server.map.service.MapService.SpotRequest;
@@ -116,9 +117,14 @@ class MapServiceIntegrationTest {
         assertThat(spotRepository.findByMapIdAndPreviewTrueOrderBySortOrderAscIdAsc(mapId).stream().map(Spot::getId))
                 .containsExactly(spotIds.get(1), spotIds.get(2));
 
-        // 공개 스팟을 지우면 다시 비공개
-        mapService.deleteSpot(me, spotIds.get(1));
-        assertThat(mapService.detail(me, mapId).isPublic()).isFalse();
+        // 공개 스팟은 수정·삭제 불가 → 다른 곳을 공개로 바꾸면(노출 해제) 고칠 수 있고, 다시 공개로 지정한다
+        assertError(() -> mapService.editSpot(me, spotIds.get(1),
+                new SpotPatch("새 이름", null, null, null, null, null, null, null)), ErrorCode.PREVIEW_SPOT_LOCKED);
+        assertError(() -> mapService.deleteSpot(me, spotIds.get(1)), ErrorCode.PREVIEW_SPOT_LOCKED);
+        mapService.setPreviews(me, mapId, List.of(spotIds.get(0), spotIds.get(2)));
+        assertThat(mapService.editSpot(me, spotIds.get(1),
+                new SpotPatch("새 이름", null, null, null, null, null, null, null)).name()).isEqualTo("새 이름");
+        assertThat(mapService.setPreviews(me, mapId, List.of(spotIds.get(1), spotIds.get(2))).isPublic()).isTrue();
     }
 
     @Test
@@ -128,17 +134,17 @@ class MapServiceIntegrationTest {
     }
 
     @Test
-    void 사진은_1장에서_5장까지() {
+    void 사진은_1장에서_3장까지() {
         AuthUser me = auth(user("KR", true));
         Long mapId = mapService.createMap(me, new MapRequest("지도", null)).mapId();
 
         assertError(() -> mapService.addSpot(me, mapId, spot("사진없음", List.of())), ErrorCode.PHOTO_REQUIRED);
         assertError(() -> mapService.addSpot(me, mapId, spot("빈값", List.of(" "))), ErrorCode.PHOTO_REQUIRED);
-        List<String> six = IntStream.range(0, 6).mapToObj(i -> "https://img/" + i + ".jpg").toList();
-        assertError(() -> mapService.addSpot(me, mapId, spot("여섯장", six)), ErrorCode.VALIDATION_ERROR);
+        List<String> four = IntStream.range(0, 4).mapToObj(i -> "https://img/" + i + ".jpg").toList();
+        assertError(() -> mapService.addSpot(me, mapId, spot("네장", four)), ErrorCode.VALIDATION_ERROR);
 
-        var created = mapService.addSpot(me, mapId, spot("다섯장", six.subList(0, 5)));
-        assertThat(mapService.detail(me, mapId).spots().get(0).photos()).hasSize(5);
+        var created = mapService.addSpot(me, mapId, spot("세장", four.subList(0, 3)));
+        assertThat(mapService.detail(me, mapId).spots().get(0).photos()).hasSize(3);
 
         // 수정: 사진을 보내면 통째로 바뀌고, 빈 목록은 안 된다
         var edited = mapService.editSpot(me, created.spotId(),
@@ -199,11 +205,12 @@ class MapServiceIntegrationTest {
     }
 
     @Test
-    void 코스로_쓰인_지도는_삭제할_수_없다() {
+    void 여행_중에는_새_스팟_추가만_되고_끝나도_지도_삭제는_막는다() {
         User mate = user("KR", true);
         AuthUser me = auth(mate);
         Long mapId = mapService.createMap(me, new MapRequest("코스 지도", null)).mapId();
         List<Long> spotIds = mapWithSpots(me, mapId, 5);
+        mapService.setPreviews(me, mapId, List.of(spotIds.get(0), spotIds.get(1)));
 
         User traveler = user("JP", true);
         Trip trip = tripRepository.save(Trip.of(traveler.getId(), today, today.plusDays(3), now));
@@ -211,17 +218,31 @@ class MapServiceIntegrationTest {
         match.selectCourse(mapId, 3, now);
         match = matchRepository.save(match);
 
-        assertThat(mapService.myMaps(me).get(0).inUse()).isTrue();
-        assertError(() -> mapService.deleteMap(me, mapId), ErrorCode.MAP_IN_USE);
-        assertError(() -> mapService.deleteSpot(me, spotIds.get(0)), ErrorCode.MAP_IN_USE);
+        var traveling = mapService.myMaps(me).get(0);
+        assertThat(traveling.inUse()).isTrue();
+        assertThat(traveling.travelingCount()).isEqualTo(1);
+        assertThat(traveling.selectedCount()).isEqualTo(1);
 
-        // 여행이 끝나도 matches.course_map_id 가 지도를 가리키므로 지도 삭제는 막고, 스팟 삭제는 허용
+        // 여행 중: 기존 스팟·지도 이름·공개 스팟 지정은 잠기고, 새 스팟 추가만 된다
+        SpotPatch rename = new SpotPatch("새 이름", null, null, null, null, null, null, null);
+        assertError(() -> mapService.editSpot(me, spotIds.get(3), rename), ErrorCode.MAP_LOCKED);
+        assertError(() -> mapService.deleteSpot(me, spotIds.get(3)), ErrorCode.MAP_LOCKED);
+        assertError(() -> mapService.editMap(me, mapId, new MapPatch("새 지도 이름", null)), ErrorCode.MAP_LOCKED);
+        assertError(() -> mapService.setPreviews(me, mapId, List.of(spotIds.get(2), spotIds.get(3))), ErrorCode.MAP_LOCKED);
+        assertError(() -> mapService.deleteMap(me, mapId), ErrorCode.MAP_IN_USE);
+        assertThat(mapService.addSpot(me, mapId, spot("새 장소")).spotCount()).isEqualTo(6);
+
+        // 여행이 끝나면 잠금이 풀린다. 단, matches.course_map_id 가 지도를 가리키므로 지도 삭제는 계속 막는다
         match.cancel(now);
         matchRepository.save(match);
-        assertThat(mapService.myMaps(me).get(0).inUse()).isFalse();
+        var ended = mapService.myMaps(me).get(0);
+        assertThat(ended.inUse()).isFalse();
+        assertThat(ended.travelingCount()).isZero();
+        assertThat(ended.selectedCount()).isEqualTo(1);
+        assertThat(mapService.editSpot(me, spotIds.get(3), rename).name()).isEqualTo("새 이름");
+        mapService.deleteSpot(me, spotIds.get(3));
+        assertThat(spotRepository.countByMapId(mapId)).isEqualTo(5);
         assertError(() -> mapService.deleteMap(me, mapId), ErrorCode.MAP_IN_USE);
-        mapService.deleteSpot(me, spotIds.get(0));
-        assertThat(spotRepository.countByMapId(mapId)).isEqualTo(4);
     }
 
     @Test

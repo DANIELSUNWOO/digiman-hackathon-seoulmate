@@ -39,6 +39,11 @@ public interface MapBrowseQueries extends Repository<SecretMap, Long> {
     @Query("select m.courseMapId, count(m) from Match m where m.courseMapId in :mapIds group by m.courseMapId")
     List<Object[]> countSelectedByMap(@Param("mapIds") Collection<Long> mapIds);
 
+    /** 지도별 매칭 수 (statuses 로 진행 중만 셀 수 있다). 결과: [mapId, count] */
+    @Query("select m.courseMapId, count(m) from Match m where m.courseMapId in :mapIds and m.status in :statuses group by m.courseMapId")
+    List<Object[]> countMatchesByMap(@Param("mapIds") Collection<Long> mapIds,
+                                     @Param("statuses") Collection<MatchStatus> statuses);
+
     /** 메이트별 진행 중 매칭 수 (정원 10건). 결과: [mateId, count] */
     @Query("select m.mateId, count(m) from Match m where m.mateId in :mateIds and m.status in :statuses group by m.mateId")
     List<Object[]> countActiveByMate(@Param("mateIds") Collection<UUID> mateIds,

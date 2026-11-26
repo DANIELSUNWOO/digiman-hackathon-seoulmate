@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "서울메이트",
+    "slug": "seoulmate",
+    "scheme": "seoulmate",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router"],
+    "web": { "bundler": "metro" }
+  }
+}

@@ -1,6 +1,7 @@
-# 서울메이트 API 명세서 v1.4 (11/24)
+# 서울메이트 API 명세서 v1.5 (11/26)
 
-> 기준 문서: 요구사항정의서 v3.3, ERD v2.4
+> 기준 문서: 요구사항정의서 v3.4, ERD v2.5
+> v1.5 변경: 11/25 회의 반영. 여행자 매칭 칸 무료 5칸, 차단은 양쪽 모두 언제든(사유 필수), 차단당한 쪽 피드백 API(BLOCK-03) 추가, 차단당한 쪽에는 상태를 ENDED로 표시. 바뀐 곳은 USER-01, MATCH-01·02·03·07·08, REPORT-01, BLOCK-01·03, 알림 표, 화면 매핑
 > v1.4 변경: 기술 스택 확정(Supabase + Spring Boot). 회원가입·로그인은 Supabase Auth, 이미지는 Supabase Storage에 앱이 직접 업로드. AUTH-01을 "회원 등록"으로 변경, AUTH-02·UPLOAD-01은 Supabase 사용으로 대체. 사용자 id는 uuid
 > v1.3 변경: 인증 50% 이상인데 여행 완료를 누르지 않은 매칭은 종료일이 지나면 자동 완료. 바뀐 곳은 DEV-01, MATCH-08, 알림 표, 서버 배치
 > v1.2 변경: "오늘의 추천(REC-01)"을 "메이트 찾기(MATE-01, 목록 + 정렬·필터)"로 교체, 매칭 신청은 mateId로, 매칭 조건 연령대는 칩 목록(ageGroups)으로 변경, DEV-02 삭제. 바뀐 곳은 PREF, MATE-01, MATCH-01, MATCH-07, 시연 흐름, 화면 매핑, 5~7장
@@ -192,8 +193,9 @@
 | ID | Method | URL | 설명 | 권한 | 요구사항 | 우선 |
 | --- | --- | --- | --- | --- | --- | --- |
 | REPORT-01 | POST | /reports | 신고 (어디서나) | 당사자 | F-36 | P1 |
-| BLOCK-01 | POST | /matches/{matchId}/block | 차단 (채팅 열린 뒤) | 당사자 | F-37 | P1 |
+| BLOCK-01 | POST | /matches/{matchId}/block | 차단 (언제든, 사유 필수) | 당사자 | F-37 | P1 |
 | BLOCK-02 | GET | /users/me/blocks | 내 차단 목록 | 로그인 | F-37, F-UI-18 | P2 |
+| BLOCK-03 | POST | /matches/{matchId}/block-feedback | 차단당한 쪽 피드백 | 당사자(차단당한 쪽) | F-44 | P2 |
 | NOTI-01 | GET | /notifications | 알림 목록 | 로그인 | F-39 | P0 |
 | NOTI-02 | GET | /notifications/unread-count | 안 읽은 알림 수 (홈 배지) | 로그인 | F-39 | P1 |
 | NOTI-03 | PATCH | /notifications/{notificationId}/read | 알림 읽음 | 로그인 | F-39 | P1 |
@@ -273,10 +275,11 @@ Supabase 가입 직후 한 번 호출해서 서비스용 회원(USERS)을 만든
   "verifyStatus": "VERIFIED",
   "tags": [ { "tagId": 12, "name": "静かなカフェ", "parentId": 3 } ],
   "onboarding": { "verified": true, "profile": true, "tags": true, "preferences": true, "trip": false },
-  "slots": { "total": 1, "used": 0 }
+  "slots": { "total": 5, "used": 0 }
 }
 ```
 
+- 여행자 칸은 무료 5칸이다 (`total` = USERS.match_slots, 기본 5).
 - 메이트는 `slots` 대신 `"matchCapacity": { "active": 3, "max": 10 }`를 내려준다 (메이트 홈의 n / 10).
 - 메이트의 `onboarding`에는 preferences, trip이 없다.
 
@@ -593,7 +596,7 @@ const { data } = supabase.storage.from('images').getPublicUrl(path)  // data.pub
   "chatStatus": "LOCKED",
   "mate": { "userId": 7, "nickname": "서울토박이", ... },
   "matchedAt": "2026-11-29T10:02:00+09:00",
-  "slots": { "total": 1, "used": 1 }
+  "slots": { "total": 5, "used": 1 }
 }
 ```
 
@@ -645,11 +648,14 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 {
   "chat": { "status": "REQUESTED", "myAccept": null, "partnerAccepted": true },
   "matchedAt": "...", "courseSelectedAt": "...", "endedAt": null,
-  "albumId": null
+  "albumId": null,
+  "feedbackAvailable": false
 }
 ```
 
 - myAccept: null = 아직 응답 안 함, true = 수락, false = 거절.
+- **차단당한 쪽에게는 status를 `BLOCKED` 대신 `ENDED`로 내려준다** (MATCH-02도 같음). 앱은 "매칭이 종료되었습니다"라고만 표시하고 차단 사실은 드러내지 않는다.
+- `feedbackAvailable`: 차단당한 쪽이고 아직 피드백(BLOCK-03)을 남기지 않았으면 true. 앱은 "의견 남기기" 버튼을 보여 준다.
 - partnerAccepted는 상대가 수락했는지만 true/false로 알려 준다 (상대의 거절 여부는 보여 주지 않는다).
 
 #### MATCH-04 메이트 지도 목록
@@ -718,7 +724,7 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 
 ```json
 // 응답 200
-{ "matchId": 101, "status": "CANCELED", "slots": { "total": 1, "used": 0 } }
+{ "matchId": 101, "status": "CANCELED", "slots": { "total": 5, "used": 0 } }
 ```
 
 - 메이트에게 CANCELED 알림. 칸은 바로 비워진다.
@@ -736,7 +742,7 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 // 요청 (둘 다 생략 가능. 생략하면 제목 = 지도 이름, 표지 = 첫 인증 사진)
 { "albumTitle": "はじめてのソウルカフェ旅", "coverUrl": "https://..." }
 // 응답 200
-{ "matchId": 101, "status": "COMPLETED", "albumId": 55, "slots": { "total": 1, "used": 0 } }
+{ "matchId": 101, "status": "COMPLETED", "albumId": 55, "slots": { "total": 5, "used": 0 } }
 ```
 
 - 상태 COMPLETED, 칸 반환, 앨범 1개 생성, 메이트에게 COMPLETED 알림.
@@ -935,7 +941,7 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 ```
 
 - 신고 대상자는 **서버가 매칭 상대로 정한다** (앱이 보낸 사용자 id를 믿지 않는다). 그래서 본인 신고는 구조적으로 불가능하다.
-- targetType: `PROFILE`(targetId = 상대 userId) / `VISIT`(visitId) / `COMMENT`(reactionId) / `CHAT`(messageId)
+- targetType: `PROFILE`(targetId 생략. 대상은 매칭 상대) / `VISIT`(visitId) / `COMMENT`(reactionId) / `CHAT`(messageId)
 - reason: `ABUSIVE`(욕설·비하) / `SEXUAL`(성적인 발언) / `CONTACT_REQUEST`(연락처·외부 만남 요구) / `SPAM`(광고·도배) / `OTHER`(기타, detail 필수)
 - 매칭 상태와 상관없이 (끝난 매칭이어도) 신고할 수 있다.
 
@@ -949,21 +955,43 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 `POST /matches/{matchId}/block` · 당사자 · F-37
 
 ```json
+// 요청 (reason 필수)
+{ "reason": "CONTACT_REQUEST", "detail": "LINE ID를 계속 물어봅니다" }
 // 응답 200
 { "matchId": 101, "status": "BLOCKED" }
 ```
 
-- BLOCKS 저장, 매칭 상태 BLOCKED, 여행자 칸 반환. 이후 두 사람은 서로의 메이트 찾기 목록에 나오지 않는다.
-- 차단당한 쪽에는 알림을 보내지 않는다. 상대 화면에는 매칭이 종료된 것으로만 보인다.
+- **채팅 여부와 상관없이 언제든** 차단할 수 있다. 여행자·메이트 모두 가능. 메이트에게는 매칭 취소 버튼이 없으므로, 원치 않는 매칭을 끝내는 수단이기도 하다.
+- reason: 신고와 같은 목록 `ABUSIVE` / `SEXUAL` / `CONTACT_REQUEST` / `SPAM` / `OTHER`(detail 필수)
+- 진행 중인 매칭(MATCHED·ON_COURSE)이면 BLOCKED로 바꾸고 여행자 칸을 반환한다. 이미 끝난 매칭이면 차단만 저장한다(이후 목록에서 서로 제외).
+- 차단당한 쪽에는 CANCELED 알림을 "매칭이 종료되었습니다" 문구로 보낸다. **차단 사실은 밝히지 않는다.**
+- 부당한 차단에 대한 판단과 불이익은 MVP에서 구현하지 않는다 (F-OPT-10). 사유와 피드백(BLOCK-03)은 그 판단의 근거로 저장해 둔다.
 
 | 상태 | 코드 | 상황 |
 | --- | --- | --- |
-| 409 | CHAT_NOT_OPEN | 채팅이 열리기 전 (그 전에는 신고로 처리, F-22) |
+| 400 | VALIDATION_ERROR | reason 누락, OTHER인데 detail 없음 |
 | 409 | ALREADY_BLOCKED | 이미 차단함 |
 
 #### BLOCK-02 내 차단 목록
 `GET /users/me/blocks` · 로그인 → `[ { "user": { UserSummary }, "blockedAt": "..." } ]`
 (차단 해제는 요구사항에 없어서 MVP에서 만들지 않는다.)
+
+#### BLOCK-03 차단 피드백
+`POST /matches/{matchId}/block-feedback` · 차단당한 당사자 · F-44
+
+```json
+// 요청
+{ "content": "갑자기 매칭이 끝나서 당황했어요. 저는 일정만 물어봤습니다." }
+// 응답 201
+{ "matchId": 101, "feedbackAt": "2026-11-29T15:10:00+09:00" }
+```
+
+- 매칭 1건당 1회. BLOCKS.feedback에 저장한다. 1~500자.
+
+| 상태 | 코드 | 상황 |
+| --- | --- | --- |
+| 403 | NOT_BLOCKED_PARTY | 이 매칭에서 차단당한 사람이 아님 |
+| 409 | FEEDBACK_ALREADY_SUBMITTED | 이미 작성함 |
 
 #### NOTI-01 ~ NOTI-04 알림
 `GET /notifications?cursor={notificationId}&size=20` · 로그인 · F-39
@@ -985,7 +1013,7 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 | type | 받는 사람 | 누르면 이동 |
 | --- | --- | --- |
 | MATCHED | 메이트 | 매칭 상세 |
-| CANCELED | 메이트 (탈퇴 시 상대) | 매칭 상세 |
+| CANCELED | 메이트 (여행자 취소), 상대 (탈퇴·차단 시, 문구는 "매칭이 종료되었습니다") | 매칭 상세 |
 | VISIT | 메이트 | 방문 기록 |
 | REACTION | 여행자 | 방문 기록 |
 | CHAT_REQUEST | 양쪽 | 채팅 (수락 화면) |
@@ -1028,14 +1056,14 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 | F-UI-09 메이트 지도 목록 | MATCH-04 | MATCH-05, MATCH-07 |
 | F-UI-10 코스 지도 | MATCH-03, MATCH-06 | MATCH-08, MATCH-07 |
 | F-UI-11 방문 인증 작성 | – | UPLOAD-01 → VISIT-01 |
-| F-UI-12 채팅 | MATCH-03, CHAT-02(반복) | CHAT-01, CHAT-03, REPORT-01, BLOCK-01 |
+| F-UI-12 채팅 | MATCH-03, CHAT-02(반복) | CHAT-01, CHAT-03, REPORT-01, BLOCK-01 (신고·차단은 지도 목록·코스 지도·방문 기록 화면 메뉴에서도 호출) |
 | F-UI-13 앨범·후기 | ALBUM-01, REVIEW-02 | REVIEW-01, ALBUM-02 |
 | F-UI-14 알림 목록 | NOTI-01 | NOTI-03, NOTI-04 |
 | F-UI-15 메이트 홈 | USER-01, MAP-02, MATCH-02(active), NOTI-02 | – |
 | F-UI-16 지도 만들기·스팟 등록 | MAP-03 | MAP-01, UPLOAD-01 → SPOT-01, MAP-06, SPOT-02, SPOT-03 |
 | F-UI-17 메이트 방문 기록 | MATCH-02, VISIT-02 | VISIT-03, REPORT-01 |
 | F-UI-18 마이페이지 | USER-01, BLOCK-02 | USER-04, TAG-02, USER-05, (로그아웃 = `supabase.auth.signOut()`) |
-| F-UI-19 매칭 칸 추가 | USER-01 | (MVP는 "준비 중" 안내만, API 없음) |
+| F-UI-20 차단 사유·피드백 | MATCH-03 (`feedbackAvailable`) | BLOCK-01, BLOCK-03 |
 
 ---
 
@@ -1097,7 +1125,7 @@ API를 새로 만들지 않고 MATE-01의 `matchReason`을 채운다. 목록 전
 
 ---
 
-## 7. ERD에 반영한 변경 (v2 → v2.4)
+## 7. ERD에 반영한 변경 (v2 → v2.5)
 
 | 변경 | 이유 |
 | --- | --- |
@@ -1111,3 +1139,4 @@ API를 새로 만들지 않고 MATE-01의 `matchReason`을 채운다. 목록 전
 | SECRET_MAPS.updated_at 추가 (v2.3) | 최근 업데이트 순 정렬 |
 | USERS.id → uuid(Supabase 회원 id), email·password_hash 삭제, 사용자 FK 전부 uuid (v2.4) | 로그인을 Supabase Auth가 담당 |
 | 모든 테이블 RLS 켜고 허용 정책 없음 (v2.4) | 앱이 공개 키로 DB를 직접 읽지 못하게 |
+| USERS.match_slots 기본 5, BLOCKS.reason·detail·feedback·feedback_at 추가 (v2.5) | 무료 5칸, 언제든 차단(사유 필수), 차단당한 쪽 피드백 |

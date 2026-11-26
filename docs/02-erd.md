@@ -1,6 +1,17 @@
-# 서울메이트 ERD v2.4 (11/24, 요구사항정의서 v3.3 · API 명세서 v1.4 기준)
+# 서울메이트 ERD v2.5 (11/26, 요구사항정의서 v3.4 · API 명세서 v1.5 기준)
 
 > Supabase Postgres 기준. 테이블 17개. 로그인 정보(이메일·비밀번호)는 Supabase Auth(auth.users)가 관리하고, 이 문서의 USERS는 서비스용 회원 정보다.
+
+---
+
+## 0-B. v2.4 → v2.5 변경 (11/25 회의 반영)
+
+| 변경 | 이유 |
+| --- | --- |
+| USERS.match_slots 기본값 1 → **5** (최대 5) | 유료화 제외, 여행자 무료 5칸 |
+| BLOCKS에 **reason, detail** 추가 | 차단은 언제든 가능, 사유 필수 |
+| BLOCKS에 **feedback, feedback_at** 추가 | 차단으로 매칭이 끝난 쪽의 의견 (부당한 차단을 가려내기 위한 기록) |
+| 설정값 FREE_MATCH_SLOTS(1) → MAX_MATCH_SLOTS(5) | |
 
 ---
 
@@ -102,7 +113,7 @@ erDiagram
     varchar profile_image_url
     text bio
     enum verify_status "NONE / VERIFIED"
-    int match_slots "여행자 매칭 칸 수, 기본 1"
+    int match_slots "여행자 매칭 칸 수, 무료 5"
     enum status "ACTIVE / WITHDRAWN"
     timestamp terms_agreed_at
     timestamp created_at
@@ -244,6 +255,10 @@ erDiagram
     uuid blocker_id PK,FK
     uuid blocked_id PK,FK
     bigint match_id FK
+    varchar reason "차단 사유 (필수)"
+    text detail
+    text feedback "차단당한 쪽 의견"
+    timestamp feedback_at
     timestamp created_at
   }
 ```
@@ -254,7 +269,7 @@ erDiagram
 
 | 정책 | 계산 방법 |
 | --- | --- |
-| 여행자 빈 칸 수 | `USERS.match_slots` − 진행 중 매칭 수 (MATCHES.status가 MATCHED 또는 ON_COURSE) |
+| 여행자 빈 칸 수 | `USERS.match_slots`(기본 5) − 진행 중 매칭 수 (MATCHES.status가 MATCHED 또는 ON_COURSE) |
 | 메이트 정원 (10명) | 진행 중 매칭 수가 10 미만인 메이트만 목록에 표시 |
 | 메이트 공개 조건 | 스팟 5곳 이상 + is_preview 2곳인 지도(= 공개 지도)가 1개 이상 있는 메이트만 목록에 표시 |
 | 목록 제외 대상 | 차단 관계(BLOCKS, 양방향), 정원 초과, 공개 조건 미달, 탈퇴, 이 여행자와 이미 진행 중 매칭이 있는 메이트 |
@@ -269,7 +284,8 @@ erDiagram
 | 채팅 열림 | traveler_chat_ok, mate_chat_ok 둘 다 true → chat_status = OPEN |
 | 자동 종료 (매일 1회) | TRIPS.end_date < 오늘 + 진행 중 + (코스 미선택 또는 SPOT_VISITS 개수 < required_visits) → status = EXPIRED |
 | 자동 완료 (같은 배치) | TRIPS.end_date < 오늘 + status = ON_COURSE + SPOT_VISITS 개수 ≥ required_visits → status = COMPLETED + ALBUMS 1행 생성 (제목 = 지도 이름, 표지 = 첫 인증 사진) |
-| 차단 | BLOCKS 저장 + 해당 MATCHES.status = BLOCKED (chat_status = OPEN일 때만 허용) |
+| 차단 | BLOCKS 저장(사유 필수) + 진행 중이면 해당 MATCHES.status = BLOCKED, 칸 반환. 채팅 여부와 상관없이 언제든 |
+| 차단 피드백 | 차단당한 쪽이 BLOCKS.feedback에 1회 저장 (feedback이 null일 때만) |
 
 ---
 
@@ -300,7 +316,7 @@ erDiagram
 | MAP_PREVIEW_SPOTS | 2 | 공개 스팟 수 |
 | CHAT_UNLOCK_RATIO | 0.5 | 채팅 요청에 필요한 인증 비율 (코스 스팟 수 × 0.5, 올림) |
 | VISIT_RADIUS_METERS | 200 | 방문 인증 반경 |
-| FREE_MATCH_SLOTS | 1 | 무료 매칭 칸 |
+| MAX_MATCH_SLOTS | 5 | 여행자 매칭 칸 (무료) |
 | MAX_TAGS | 10 | 취향 최대 개수 |
 | MIN_AGE | 18 | 가입 최소 나이 |
 
@@ -320,7 +336,7 @@ erDiagram
 | birth_year | int | 연령대 계산, 만 18세 이상 |
 | profile_image_url, bio | | 프로필 |
 | verify_status | enum | NONE / VERIFIED (MVP는 업로드하면 VERIFIED) |
-| match_slots | int | 여행자의 매칭 칸 수. 기본 1 |
+| match_slots | int | 여행자의 매칭 칸 수. 기본 5 (무료, 최대 5) |
 | status | enum | ACTIVE / WITHDRAWN |
 | terms_agreed_at | timestamp | 약관 동의 시각 |
 
@@ -409,6 +425,8 @@ erDiagram
 | REPORTS.reason, detail, status | | 사유, 상세, 처리 상태 |
 | BLOCKS.(blocker_id, blocked_id) | 복합 PK | 차단 관계. 이후 메이트 찾기 목록에서 서로 제외 |
 | BLOCKS.match_id | bigint FK | 어느 매칭에서 차단했는지 |
+| BLOCKS.reason, detail | | 차단 사유(ABUSIVE / SEXUAL / CONTACT_REQUEST / SPAM / OTHER, 신고와 같은 목록, 필수)와 상세 |
+| BLOCKS.feedback, feedback_at | | 차단당한 쪽의 의견. MVP는 저장만, 판단·불이익은 확장 기능 |
 
 ---
 
@@ -427,6 +445,6 @@ erDiagram
 | F-29~F-31 (채팅) | MATCHES.chat_*, CHAT_MESSAGES |
 | F-32~F-34 (완료·앨범·후기) | MATCHES, ALBUMS, REVIEWS |
 | F-35 (AI 번역) | 각 테이블의 *_translated 컬럼 |
-| F-36~F-38 (신고·차단·개인정보) | REPORTS, BLOCKS |
+| F-36~F-38, F-44 (신고·차단·개인정보·차단 피드백) | REPORTS, BLOCKS |
 | F-39 (알림) | NOTIFICATIONS |
 | F-43 (탈퇴) | USERS.status |

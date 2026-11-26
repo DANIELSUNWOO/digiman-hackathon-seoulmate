@@ -1,15 +1,24 @@
 import { Redirect, Tabs } from "expo-router";
+import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { House, MapTrifold, User } from "phosphor-react-native";
 import { useRole } from "../../src/state";
 import { useSession } from "../../src/session";
 import { theme } from "../../src/theme";
+import { nextStep } from "../../src/users";
 export default function TabsLayout() {
-  const { role, ready: roleReady } = useRole();
-  const { session, ready: sessionReady } = useSession();
+  const { ready: roleReady, syncServerRole } = useRole();
+  const { session, ready: sessionReady, load, busy } = useSession();
+  useEffect(() => {
+    if (session && load.kind === "ready")
+      syncServerRole(load.me.role === "MATE" ? "mate" : "traveler");
+  }, [session?.user.id, load.kind === "ready" ? load.me.role : null]);
   if (!roleReady || !sessionReady) return null;
-  if (!role || !session) return <Redirect href="/auth" />;
-  const ko = role === "mate";
+  if (!session) return <Redirect href="/auth" />;
+  if (busy || load.kind === "loading") return null;
+  if (load.kind !== "ready" || nextStep(load.me))
+    return <Redirect href="/account" />;
+  const ko = load.me.language === "ko";
   return (
     <Tabs
       screenOptions={{

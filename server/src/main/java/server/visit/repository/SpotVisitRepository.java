@@ -3,6 +3,7 @@ package server.visit.repository;
 import server.visit.domain.SpotVisit;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,4 +12,6 @@ public interface SpotVisitRepository extends JpaRepository<SpotVisit, Long> {
     long countByMatchId(Long matchId);
     List<SpotVisit> findByMatchId(Long matchId);
     Optional<SpotVisit> findFirstByMatchIdOrderByVerifiedAtDesc(Long matchId);
+    boolean existsBySpotId(Long spotId);
+    boolean existsBySpotIdIn(Collection<Long> spotIds);
 }

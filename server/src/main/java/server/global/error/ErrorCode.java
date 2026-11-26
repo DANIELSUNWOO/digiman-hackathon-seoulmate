@@ -70,7 +70,16 @@ public enum ErrorCode {
 
     // 방문 인증 (서버 B)
     LOCATION_REQUIRED(HttpStatus.BAD_REQUEST, "위치 정보가 필요합니다."),
-    OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "스팟 근처(200m 이내)에서 다시 시도해 주세요.");
+    OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "스팟 근처(200m 이내)에서 다시 시도해 주세요."),
+
+    // 비밀지도·스팟 (서버 B)
+    MAP_NOT_FOUND(HttpStatus.NOT_FOUND, "지도를 찾을 수 없습니다."),
+    SPOT_NOT_FOUND(HttpStatus.NOT_FOUND, "스팟을 찾을 수 없습니다."),
+    NOT_MAP_OWNER(HttpStatus.FORBIDDEN, "지도 작성자만 할 수 있습니다."),
+    MAP_IN_USE(HttpStatus.CONFLICT, "여행 코스로 쓰였거나 방문 기록이 있어 삭제할 수 없습니다."),
+    PREVIEW_COUNT_INVALID(HttpStatus.BAD_REQUEST, "공개 스팟은 정확히 2곳을 골라 주세요."),
+    SPOT_NOT_IN_MAP(HttpStatus.BAD_REQUEST, "이 지도의 스팟이 아닙니다."),
+    PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "사진을 1장 이상 올려 주세요.");
 
     private final HttpStatus status;
     private final String message;

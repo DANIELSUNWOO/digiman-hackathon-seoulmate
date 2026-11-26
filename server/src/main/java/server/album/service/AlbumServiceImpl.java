@@ -15,7 +15,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 
-/** [B 소유] 임시로 A가 작성한 동작하는 구현. 선우님이 자유롭게 수정 */
+/** [B 소유] 여행 완료(MATCH-08)·자동 완료 배치에서 앨범 생성. 빈 제목·표지는 기본값(지도 이름·첫 인증 사진)으로 */
 @Service
 @RequiredArgsConstructor
 public class AlbumServiceImpl implements AlbumService {
@@ -30,16 +30,16 @@ public class AlbumServiceImpl implements AlbumService {
     @Transactional
     public Long createForMatch(Long matchId, String title, String coverUrl) {
         return albumRepository.findByMatchId(matchId).map(Album::getId).orElseGet(() -> {
-            String t = title;
+            String t = title == null || title.isBlank() ? null : title.trim();
             if (t == null) {
                 t = matchRepository.findById(matchId)
                         .flatMap(m -> m.getCourseMapId() == null ? java.util.Optional.<SecretMap>empty() : mapRepository.findById(m.getCourseMapId()))
                         .map(SecretMap::getTitle).orElse(null);
             }
-            String cover = coverUrl;
+            String cover = coverUrl == null || coverUrl.isBlank() ? null : coverUrl.trim();
             if (cover == null) {
                 cover = visitRepository.findByMatchId(matchId).stream()
-                        .min(Comparator.comparing(SpotVisit::getVerifiedAt))
+                        .min(Comparator.comparing(SpotVisit::getVerifiedAt).thenComparing(SpotVisit::getId))
                         .map(SpotVisit::getPhotoUrl).orElse(null);
             }
             return albumRepository.save(Album.of(matchId, t, cover, LocalDateTime.now(clock))).getId();

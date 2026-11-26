@@ -79,6 +79,27 @@ public class Spot {
 
     public void setPreview(boolean preview) { this.preview = preview; }
 
+    /** SPOT-02 수정. null 인 값은 그대로 둔다. 글이 바뀌면 번역을 비우고 다시 번역한다 */
+    public void edit(String name, String address, BigDecimal lat, BigDecimal lng, Long tagId,
+                     String reason, String review) {
+        if (name != null) this.name = name;
+        if (address != null) this.address = address;
+        if (lat != null) this.lat = lat;
+        if (lng != null) this.lng = lng;
+        if (tagId != null) this.tagId = tagId;
+        if (reason != null) { this.reason = reason; this.reasonTranslated = null; }
+        if (review != null) { this.review = review; this.reviewTranslated = null; }
+    }
+
+    public void replacePhotos(List<String> urls) {
+        photos.clear();
+        urls.forEach(this::addPhoto);
+    }
+
+    public void fillReasonTranslation(String translated) { this.reasonTranslated = translated; }
+
+    public void fillReviewTranslation(String translated) { this.reviewTranslated = translated; }
+
     public List<String> photoUrls() {
         return photos.stream().map(SpotPhoto::getUrl).toList();
     }

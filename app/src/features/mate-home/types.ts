@@ -20,6 +20,27 @@ export type MyMap = {
   travelingCount?: number;
 };
 
+/** GET /maps/{mapId}의 스팟 중 지도 상세에서 쓰는 부분 */
+export type MapSpot = {
+  spotId: number;
+  name: string;
+  address: string | null;
+  reason: LocalizedText | null;
+  isPreview: boolean;
+};
+
+/** GET /maps/{mapId}. inUse는 오지 않아 GET /maps/me에서 확인한다. */
+export type MapDetail = {
+  mapId: number;
+  title: string;
+  caption: LocalizedText | null;
+  isPublic: boolean;
+  spots: MapSpot[];
+};
+
+/** POST /maps, PATCH /maps/{mapId} 요청. title 1~30자, caption 0~300자 */
+export type MapInput = { title: string; caption: string };
+
 /** GET /users/me 중 메이트 홈에서 쓰는 부분 */
 export type MateProfile = {
   // 서버는 메이트 계정에만 내려준다. 기기에 저장된 역할과 계정이 다르면 없다.

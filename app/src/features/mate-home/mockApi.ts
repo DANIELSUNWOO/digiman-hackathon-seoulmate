@@ -1,69 +1,104 @@
 // 개발 전용 경로(/dev/mate-home)에서 서버 없이 화면 상태를 확인하기 위한 목.
 import { ApiError } from "../../api";
 import type { MateHomeApi } from "./api";
-import type { MatchItem, MyMap } from "./types";
+import { MAPS, MATCHES, mockSpots } from "./mockData";
+import type { MapDetail, MapInput, MyMap } from "./types";
 
 export type MockScenario = "data" | "empty" | "error";
 
-const MAPS: MyMap[] = [
-  {
-    mapId: 1,
-    title: "혼자 가기 좋은 성수 카페",
-    caption: {
-      original: "조용히 책 읽기 좋은 카페만 모았어요",
-      translated: "静かに本を読むのにぴったりなカフェだけを集めました",
-      sourceLang: "ko",
-    },
-    spotCount: 6,
-    previewCount: 2,
-    isPublic: true,
-    inUse: true,
-    selectedCount: 3,
-    travelingCount: 1,
-  },
-  {
-    mapId: 2,
-    title: "연남동 산책",
-    caption: null,
-    spotCount: 4,
-    previewCount: 1,
+function serverError(status: number, code: string) {
+  return new ApiError("HTTP", "mock server error", status, { code });
+}
+
+function captionOf(text: string): MyMap["caption"] {
+  return text ? { original: text, translated: null, sourceLang: "ko" } : null;
+}
+
+function newMap(mapId: number, { title, caption }: MapInput): MyMap {
+  return {
+    mapId,
+    title,
+    caption: captionOf(caption),
+    spotCount: 0,
+    previewCount: 0,
     isPublic: false,
     inUse: false,
-  },
-];
+    selectedCount: 0,
+    travelingCount: 0,
+  };
+}
 
-const MATCHES: MatchItem[] = [
-  {
-    matchId: 102,
-    chatStatus: "LOCKED",
-    partner: { nickname: "ゆうと" },
-    courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
-    progress: { visited: 0, required: 3, total: 6 },
-    lastVisitAt: null,
-  },
-  {
-    matchId: 101,
-    chatStatus: "LOCKED",
-    partner: { nickname: "はるか" },
-    courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
-    progress: { visited: 2, required: 3, total: 6 },
-    lastVisitAt: "2026-11-29T14:03:00+09:00",
-  },
-];
+function applyChanges(map: MyMap, { title, caption }: Partial<MapInput>) {
+  return {
+    ...map,
+    title: title ?? map.title,
+    caption: caption === undefined ? map.caption : captionOf(caption),
+  };
+}
 
-export function createMockMateHomeApi(scenario: MockScenario): MateHomeApi {
-  const respond = <T>(data: T, empty: T): Promise<T> => {
-    if (scenario === "error")
-      return Promise.reject(new ApiError("NETWORK", "mock network error"));
-    return Promise.resolve(scenario === "empty" ? empty : data);
+/** 지도 생성·수정·삭제 결과를 목록에 반영하는 메모리 저장소 */
+function createMapStore(initial: MyMap[]) {
+  let maps = initial;
+  const find = (mapId: number): MyMap => {
+    const map = maps.find((item) => item.mapId === mapId);
+    if (!map) throw serverError(404, "MAP_NOT_FOUND");
+    return map;
+  };
+  const findEditable = (mapId: number) => {
+    const map = find(mapId);
+    if (map.inUse) throw serverError(409, "MAP_LOCKED");
+    return map;
   };
   return {
+    list: () => maps,
+    detail: (mapId: number): MapDetail => {
+      const map = find(mapId);
+      const { title, caption, isPublic } = map;
+      return { mapId, title, caption, isPublic, spots: mockSpots(map) };
+    },
+    create: (input: MapInput) => {
+      const mapId = Math.max(0, ...maps.map((map) => map.mapId)) + 1;
+      maps = [...maps, newMap(mapId, input)];
+      return { mapId };
+    },
+    update: (mapId: number, changes: Partial<MapInput>) => {
+      findEditable(mapId);
+      maps = maps.map((map) =>
+        map.mapId === mapId ? applyChanges(map, changes) : map,
+      );
+    },
+    remove: (mapId: number) => {
+      if (findEditable(mapId).selectedCount)
+        throw serverError(409, "MAP_IN_USE");
+      maps = maps.filter((map) => map.mapId !== mapId);
+    },
+  };
+}
+
+export function createMockMateHomeApi(scenario: MockScenario): MateHomeApi {
+  const store = createMapStore(scenario === "data" ? MAPS : []);
+  const matches = scenario === "data" ? MATCHES : [];
+  const respond = <T>(action: () => T): Promise<T> =>
+    new Promise((resolve, reject) => {
+      if (scenario === "error")
+        return reject(new ApiError("NETWORK", "mock network error"));
+      try {
+        resolve(action());
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+  return {
     getProfile: () =>
-      respond(
-        { matchCapacity: { active: MATCHES.length, max: 10 } },
-        { matchCapacity: { active: 0, max: 10 } },
-      ),
-    getMyMaps: () => respond(MAPS, []),
-    getActiveMatches: () => respond(MATCHES, []),
+      respond(() => ({
+        matchCapacity: { active: matches.length, max: 10 },
+      })),
+    getActiveMatches: () => respond(() => matches),
+    getMyMaps: () => respond(store.list),
+    getMapDetail: (mapId) => respond(() => store.detail(mapId)),
+    createMap: (input) => respond(() => store.create(input)),
+    updateMap: (mapId, changes) => respond(() => store.update(mapId, changes)),
+    deleteMap: (mapId) => respond(() => store.remove(mapId)),
   };
 }

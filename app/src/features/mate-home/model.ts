@@ -1,17 +1,19 @@
 import { strings } from "./strings";
-import type { MatchItem, MyMap } from "./types";
+import type { MapInput, MatchItem, MyMap } from "./types";
 
 // 서버 정책값의 앱 사본. 부족한 조건을 안내하는 데만 쓰고, 노출 판정은 서버의 isPublic을 따른다.
 const MAP_MIN_SPOTS = 5;
 const MAP_PREVIEW_SPOTS = 2;
+export const MAP_TITLE_MAX = 30;
+export const MAP_CAPTION_MAX = 300;
 
-export function spotLabel(map: MyMap): string {
+export function spotLabel(map: Pick<MyMap, "spotCount">): string {
   return map.spotCount >= MAP_MIN_SPOTS
     ? strings.spotCount(map.spotCount)
     : strings.spotShortage(map.spotCount, MAP_MIN_SPOTS);
 }
 
-export function previewLabel(map: MyMap): string {
+export function previewLabel(map: Pick<MyMap, "previewCount">): string {
   return strings.previewCount(map.previewCount, MAP_PREVIEW_SPOTS);
 }
 
@@ -39,4 +41,15 @@ export function sortByLastVisit(matches: readonly MatchItem[]): MatchItem[] {
   const time = (match: MatchItem) =>
     match.lastVisitAt ? Date.parse(match.lastVisitAt) : 0;
   return [...matches].sort((a, b) => time(b) - time(a));
+}
+
+/** 수정 요청에는 바뀐 값만 담는다. */
+export function changedFields(
+  before: MapInput,
+  after: MapInput,
+): Partial<MapInput> {
+  return {
+    ...(before.title !== after.title && { title: after.title }),
+    ...(before.caption !== after.caption && { caption: after.caption }),
+  };
 }

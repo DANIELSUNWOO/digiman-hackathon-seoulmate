@@ -1,16 +1,8 @@
 import { ActivityIndicator } from "react-native";
-import { ApiError } from "../../api";
 import { theme } from "../../theme";
 import { Button, Label } from "../../ui";
+import { errorMessage } from "./errors";
 import { strings } from "./strings";
-
-function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.code === "NETWORK") return strings.errorNetwork;
-    if (error.code === "SESSION_EXPIRED") return strings.errorSession;
-  }
-  return strings.errorDefault;
-}
 
 export function Loading() {
   return (

@@ -1,11 +1,10 @@
 package server.match.service;
 
-import server.album.repository.AlbumRepository;
 import server.global.common.Times;
 import server.global.common.UserSummary;
 import server.global.error.ApiException;
 import server.global.error.ErrorCode;
-import server.global.event.MatchCompletedEvent;
+import server.album.service.AlbumService;
 import server.global.security.AuthUser;
 import server.match.domain.Match;
 import server.match.domain.MatchStatus;
@@ -19,7 +18,6 @@ import server.user.domain.User;
 import server.user.repository.MatchPreferenceRepository;
 import server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,11 +39,10 @@ public class MatchService {
     private final MatchPreferenceRepository preferenceRepository;
     private final MateEligibility mateEligibility;
     private final UserRepository userRepository;
-    private final AlbumRepository albumRepository;
     private final MatchAccess matchAccess;
     private final MatchViewAssembler views;
     private final NotificationPublisher notificationPublisher;
-    private final ApplicationEventPublisher eventPublisher;
+    private final AlbumService albumService;
     private final Clock clock;
 
     /**
@@ -78,7 +75,7 @@ public class MatchService {
         mateEligibility.check(traveler, pref, mate);      // MATE_NOT_AVAILABLE / ALREADY_MATCHED / MATE_FULL
 
         Match match = matchRepository.save(Match.create(trip.getId(), traveler.getId(), mate.getId(), LocalDateTime.now(clock)));
-        notificationPublisher.publish(mate.getId(), NotificationType.MATCHED, match.getId(), traveler.getNickname());
+        notificationPublisher.publish(mate.getId(), NotificationType.MATCHED, match.getId());
 
         return new MatchDtos.ApplyResponse(match.getId(), match.getStatus().name(), match.getChatStatus().name(),
                 UserSummary.of(mate, today), Times.kst(match.getMatchedAt()),
@@ -124,7 +121,7 @@ public class MatchService {
         if (m.getMateId().equals(me.id())) throw new ApiException(ErrorCode.MATE_CANNOT_CANCEL);
         m.cancel(LocalDateTime.now(clock));
         User traveler = userRepository.findById(me.id()).orElseThrow();
-        notificationPublisher.publish(m.getMateId(), NotificationType.CANCELED, m.getId(), traveler.getNickname());
+        notificationPublisher.publish(m.getMateId(), NotificationType.CANCELED, m.getId());
         matchRepository.flush();
         return new MatchDtos.CancelResponse(m.getId(), m.getStatus().name(), views.slotsOf(traveler));
     }
@@ -135,12 +132,10 @@ public class MatchService {
         Match m = matchAccess.travelerMember(matchId, me, true);
         m.complete(LocalDateTime.now(clock));
         User traveler = userRepository.findById(me.id()).orElseThrow();
-        // 서버 B 앨범 담당이 @EventListener 로 같은 트랜잭션에서 ALBUMS 생성
-        eventPublisher.publishEvent(new MatchCompletedEvent(m.getId(),
-                req == null ? null : req.albumTitle(), req == null ? null : req.coverUrl(), false));
-        notificationPublisher.publish(m.getMateId(), NotificationType.COMPLETED, m.getId(), traveler.getNickname());
+        Long albumId = albumService.createForMatch(m.getId(),                    // B 구현
+                req == null ? null : req.albumTitle(), req == null ? null : req.coverUrl());
+        notificationPublisher.publish(m.getMateId(), NotificationType.COMPLETED, m.getId());
         matchRepository.flush();
-        Long albumId = albumRepository.findByMatchId(m.getId()).map(a -> a.getId()).orElse(null);
         return new MatchDtos.CompleteResponse(m.getId(), m.getStatus().name(), albumId, views.slotsOf(traveler));
     }
 }

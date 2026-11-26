@@ -41,25 +41,33 @@ cp .env.example .env   # 값 채우기 (DM으로 받기)
 | 7 | 자동 종료·자동 완료 | `MatchLifecycleJob`, `DevController` | 배치(매일 00:10) + DEV-01 |
 | 8 | 신고·차단 | `safety/*` | REPORT-01, BLOCK-01, 02 |
 
-## 파트 B 연동 (여기만 맞추면 됨)
+## 파트 A·B 연결 지점 (선우님 제안 기준)
 
-엔티티·Repository는 마이그레이션과 함께 17개 테이블 전부 만들어 두었습니다. `[서버 B 소유]` 표시된 클래스(`map`, `visit`, `album`)에는 파트 B가 자유롭게 메서드를 추가하면 됩니다.
+**테이블 소유권** — 남의 테이블은 Repository로 읽기만 직접, 쓰기는 주인 서비스를 통해서
+- A(진용): users, match_preferences, user_tags, trips, matches, chat_messages, notifications, reports, blocks
+- B(선우): tags, secret_maps, spots, spot_photos, spot_visits, visit_reactions, albums, reviews
+- B 테이블의 엔티티·Repository·아래 `*Impl` 은 A가 임시로 만들어 둔 것. 선우님이 자유롭게 고치면 됨
 
-| 방향 | 무엇 | 어떻게 |
+**① A가 만들고 B가 씀**
+| 이름 | 쓰임 |
+|---|---|
+| `AuthUser me` (컨트롤러 파라미터) | 로그인 사용자 id(uuid)·역할. 등록 전 404, 탈퇴 403 자동 |
+| `throw new ApiException(ErrorCode.X)` | `status/code/message` 형식 자동 응답. ErrorCode 는 영역별로 묶어서 추가 |
+| `NotificationPublisher.publish(UUID userId, NotificationType type, Long matchId, Object... extra)` | `{0}` 상대 닉네임은 자동. 방문 인증: `publish(mateId, VISIT, matchId, spotName)`, 리액션: `publish(travelerId, REACTION, matchId)` |
+| `MatchAccess.requireMember(Long matchId, UUID userId)` → `MatchMembership` | 상태, 채팅 상태, 코스 지도 id, required_visits, 내 역할, 상대 id. 없으면 404, 당사자 아니면 403 |
+| `MatchProgressService.onVisitVerified(Long matchId)` | VISIT-01 저장 직후 같은 트랜잭션에서. 필요 인증 수 도달 시 채팅 REQUESTED + 양쪽 알림(A). 반환값 = `chatRequested` |
+| `MateEligibility.isListable(여행자, 매칭조건, 메이트)` | MATE-01 목록 조건 = MATCH-01 재검증 기준 |
+| `BlockQueryService.blockedRelations(userId)` | 차단 관계 제외 |
+
+**② B가 만들고 A가 씀** (인터페이스 + 임시 구현이 들어 있음. 선우님은 구현만 교체)
+| 인터페이스 | 임시 구현 | A가 쓰는 곳 |
 |---|---|---|
-| B → A | 알림 보내기 | `notificationPublisher.publish(받는사람id, NotificationType.VISIT, matchId, 닉네임, 스팟이름)` |
-| B → A | 방문 인증 후 채팅 요청 판정 | VISIT-01 저장 직후 **같은 트랜잭션에서** `matchProgressService.onVisitVerified(matchId)` → 반환값을 응답 `chatRequested` 에 |
-| B → A | 당사자 권한 검사 | `matchAccess.member(matchId, me)` / `travelerMember(...)` / `mateMember(...)` |
-| B → A | 메이트 찾기(MATE-01) 목록 조건 | `mateEligibility.isListable(여행자, 매칭조건, 메이트)` — MATCH-01 재검증과 같은 기준 |
-| B → A | 차단 관계 제외 | `blockQueryService.blockedRelations(travelerId)` |
-| B → A | 지도 공개 조건 (5곳 + 공개 2곳) | `mapVisibility.isPublic(mapId)` |
-| B → A | 지도·스팟 수정 시 | `secretMap.touch(now)` 로 updated_at 갱신 ("최근 업데이트 순") |
-| A → B | 번역 요청 | `TranslationRequestedEvent` 발행 → B가 `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async` 로 받아 `*_translated` 채움 |
-| A → B | 여행 완료·자동 완료 시 앨범 | `MatchCompletedEvent` 발행 → B가 `@EventListener`(동기)로 받아 ALBUMS 생성 (제목/표지 null 이면 지도 이름/첫 인증 사진) |
-| 공용 | 현재 사용자 | 컨트롤러 파라미터 `AuthUser me` |
-| 공용 | 에러 | `throw new ApiException(ErrorCode.XXX)` → 명세서 형식 자동 응답 |
-| 공용 | 정책 숫자 | `PolicyProperties` (`seoulmate.policy.*`) |
-| 공용 | 번역 텍스트 응답 | `LocalizedText.of(원문, 번역, "ko")` |
+| `translation.TranslationService.translateAsync(target, id, text, from, to)` | `NoOpTranslationService` (번역 안 함) | 쪽지 보내기. **커밋 후 비동기**로 `*_translated` 채우기, 실패 시 null |
+| `map.service.MapQuery.findPublicMaps / isPublic / spotCount` | `MapQueryImpl` (동작함) | 지도 목록, 코스 선택, required_visits 계산, 메이트 조건 |
+| `visit.service.VisitQuery.countByMatch / authorOf / reactionAuthorOf / matchIdOfVisit / matchIdOfReaction` | `VisitQueryImpl` (동작함) | 진행률, 자동 종료·완료, 채팅 요청 판정, 신고 대상 확인 |
+| `album.service.AlbumService.createForMatch(matchId, title, coverUrl)` → albumId | `AlbumServiceImpl` (동작함) | 여행 완료(MATCH-08), 자동 완료 배치 |
+
+**공용 파일 규칙**: `build.gradle`, `application.yaml`, Security 설정, `ErrorCode` 는 고치기 전에 슬랙에 한마디. 브랜치는 `feature/sa-...`(A), `feature/sb-...`(B)
 
 ## 보안 처리 요약
 - Supabase 토큰을 JWKS로 검증 (서명, 만료, iss, aud), 탈퇴 회원의 남은 토큰은 매 요청 차단

@@ -2,17 +2,15 @@ package server.match.service;
 
 import java.util.UUID;
 
-import server.global.event.MatchCompletedEvent;
+import server.album.service.AlbumService;
 import server.match.domain.Match;
 import server.match.domain.MatchStatus;
 import server.match.repository.MatchRepository;
 import server.notification.domain.NotificationType;
 import server.notification.service.NotificationPublisher;
-import server.user.repository.UserRepository;
-import server.visit.repository.SpotVisitRepository;
+import server.visit.service.VisitQuery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -34,10 +32,9 @@ import java.time.LocalDateTime;
 public class MatchLifecycleJob {
 
     private final MatchRepository matchRepository;
-    private final SpotVisitRepository visitRepository;
-    private final UserRepository userRepository;
+    private final VisitQuery visitQuery;
+    private final AlbumService albumService;
     private final NotificationPublisher notificationPublisher;
-    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate tx;
     private final Clock clock;
 
@@ -68,26 +65,20 @@ public class MatchLifecycleJob {
         Match m = matchRepository.findByIdForUpdate(matchId).orElseThrow();
         if (!m.getStatus().isActive()) return Outcome.SKIPPED;            // 그 사이 취소·완료됨
         LocalDateTime now = LocalDateTime.now(clock);
-        String travelerName = nickname(m.getTravelerId());
-        String mateName = nickname(m.getMateId());
 
         boolean reached = m.getStatus() == MatchStatus.ON_COURSE && m.getRequiredVisits() != null
-                && visitRepository.countByMatchId(m.getId()) >= m.getRequiredVisits();
+                && visitQuery.countByMatch(m.getId()) >= m.getRequiredVisits();
         if (reached) {
             m.complete(now);
-            eventPublisher.publishEvent(new MatchCompletedEvent(m.getId(), null, null, true));
-            notificationPublisher.publish(m.getTravelerId(), NotificationType.COMPLETED, m.getId(), mateName);
-            notificationPublisher.publish(m.getMateId(), NotificationType.COMPLETED, m.getId(), travelerName);
+            albumService.createForMatch(m.getId(), null, null);                       // B 구현
+            notificationPublisher.publish(m.getTravelerId(), NotificationType.COMPLETED, m.getId());
+            notificationPublisher.publish(m.getMateId(), NotificationType.COMPLETED, m.getId());
             return Outcome.COMPLETED;
         }
         m.expire(now);
-        notificationPublisher.publish(m.getTravelerId(), NotificationType.EXPIRED, m.getId(), mateName);
-        notificationPublisher.publish(m.getMateId(), NotificationType.EXPIRED, m.getId(), travelerName);
+        notificationPublisher.publish(m.getTravelerId(), NotificationType.EXPIRED, m.getId());
+        notificationPublisher.publish(m.getMateId(), NotificationType.EXPIRED, m.getId());
         return Outcome.EXPIRED;
-    }
-
-    private String nickname(UUID userId) {
-        return userRepository.findById(userId).map(u -> u.getNickname()).orElse("-");
     }
 
     private enum Outcome { EXPIRED, COMPLETED, SKIPPED }

@@ -1,17 +1,16 @@
 package server.notification.service;
 
-import java.util.UUID;
-
 import server.notification.domain.NotificationType;
 
+import java.util.UUID;
+
 /**
- * [공용 인터페이스] 알림 발행. 서버 A·B 어디서든 주입받아 호출한다.
- * 호출한 쪽 트랜잭션 안에서 저장되므로, 본 작업이 롤백되면 알림도 함께 롤백된다.
+ * [A 소유 · B가 사용] 알림 발행. 호출한 쪽 트랜잭션 안에서 저장된다 (본 작업이 롤백되면 알림도 롤백).
+ * 문장의 {0}(상대 닉네임)은 matchId 로 서버가 알아서 채운다. 추가 값은 extra 로 넘기면 {1}, {2} … 에 들어간다.
  *
- * 예) 서버 B 방문 인증: notificationPublisher.publish(mateId, NotificationType.VISIT, matchId, travelerNickname, spotName);
- *
- * @param args 문장 틀의 {0}, {1} … 에 들어갈 값 (보통 {0} = 상대 닉네임)
+ * 예) 방문 인증(B): notificationPublisher.publish(mateId, NotificationType.VISIT, matchId, spotName);
+ *     리액션(B):   notificationPublisher.publish(travelerId, NotificationType.REACTION, matchId);
  */
 public interface NotificationPublisher {
-    void publish(UUID receiverId, NotificationType type, Long matchId, Object... args);
+    void publish(UUID userId, NotificationType type, Long matchId, Object... extra);
 }

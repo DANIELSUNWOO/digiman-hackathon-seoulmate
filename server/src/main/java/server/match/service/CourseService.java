@@ -9,7 +9,7 @@ import server.map.domain.SecretMap;
 import server.map.domain.Spot;
 import server.map.repository.SecretMapRepository;
 import server.map.repository.SpotRepository;
-import server.map.service.MapVisibility;
+import server.map.service.MapQuery;
 import server.match.domain.Match;
 import server.visit.domain.SpotVisit;
 import server.visit.repository.SpotVisitRepository;
@@ -37,25 +37,19 @@ public class CourseService {
     private final SecretMapRepository mapRepository;
     private final SpotRepository spotRepository;
     private final SpotVisitRepository visitRepository;
-    private final MapVisibility mapVisibility;
+    private final MapQuery mapQuery;
     private final PolicyProperties policy;
     private final Clock clock;
 
     /**
-     * MATCH-04 메이트 지도 목록.
+     * MATCH-04 메이트 지도 목록 (MapQuery = B 구현).
      * 공개 스팟 2곳 외 스팟은 개수만 준다. 앱에서 숨기는 게 아니라 서버가 아예 보내지 않는다.
      */
     @Transactional(readOnly = true)
-    public List<MatchDtos.MateMap> mateMaps(AuthUser me, Long matchId) {
+    public List<MapQuery.PublicMap> mateMaps(AuthUser me, Long matchId) {
         Match m = matchAccess.travelerMember(matchId, me, false);
         if (!m.getStatus().isActive()) throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
-        return mapRepository.findByMateIdOrderByIdAsc(m.getMateId()).stream()
-                .filter(map -> mapVisibility.isPublic(map.getId()))
-                .map(map -> new MatchDtos.MateMap(map.getId(), map.getTitle(), caption(map),
-                        spotRepository.countByMapId(map.getId()),
-                        spotRepository.findByMapIdAndPreviewTrueOrderBySortOrderAscIdAsc(map.getId()).stream()
-                                .map(this::spotView).toList()))
-                .toList();
+        return mapQuery.findPublicMaps(m.getMateId());
     }
 
     /** MATCH-05 코스 지도 선택 → 여행 시작. required_visits 를 이때 계산해 저장 */
@@ -65,9 +59,9 @@ public class CourseService {
         SecretMap map = mapRepository.findById(mapId)
                 .filter(x -> x.getMateId().equals(m.getMateId()))
                 .orElseThrow(() -> new ApiException(ErrorCode.MAP_NOT_AVAILABLE));
-        if (!mapVisibility.isPublic(map.getId())) throw new ApiException(ErrorCode.MAP_NOT_AVAILABLE);
+        if (!mapQuery.isPublic(map.getId())) throw new ApiException(ErrorCode.MAP_NOT_AVAILABLE);
 
-        int spotCount = (int) spotRepository.countByMapId(map.getId());
+        int spotCount = (int) mapQuery.spotCount(map.getId());
         m.selectCourse(map.getId(), policy.requiredVisits(spotCount), LocalDateTime.now(clock));
         return new MatchDtos.CourseSelected(m.getId(), m.getStatus().name(), m.getCourseMapId(),
                 new MatchDtos.Progress(0, m.getRequiredVisits(), spotCount));
@@ -90,11 +84,6 @@ public class CourseService {
                 }).toList();
         return new MatchDtos.CourseView(new MatchDtos.MapHeader(map.getId(), map.getTitle(), caption(map)),
                 views.progress(m), spots);
-    }
-
-    private MatchDtos.SpotView spotView(Spot s) {
-        return new MatchDtos.SpotView(s.getId(), s.getName(), s.getAddress(), s.getLat(), s.getLng(), s.photoUrls(),
-                text(s.getReason(), s.getReasonTranslated()), text(s.getReview(), s.getReviewTranslated()));
     }
 
     private LocalizedText caption(SecretMap map) {

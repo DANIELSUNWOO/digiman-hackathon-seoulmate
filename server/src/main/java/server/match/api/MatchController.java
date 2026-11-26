@@ -45,7 +45,7 @@ public class MatchController {
 
     @Operation(summary = "MATCH-04 메이트 지도 목록 (캡션 + 공개 스팟 2곳만)")
     @GetMapping("/{matchId}/maps")
-    public List<MatchDtos.MateMap> mateMaps(AuthUser me, @PathVariable Long matchId) {
+    public List<server.map.service.MapQuery.PublicMap> mateMaps(AuthUser me, @PathVariable Long matchId) {
         return courseService.mateMaps(me, matchId);
     }
 

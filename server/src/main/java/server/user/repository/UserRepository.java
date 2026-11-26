@@ -12,7 +12,7 @@ import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByNickname(String nickname);
-    boolean existsByNicknameAndIdNot(String nickname, Long id);
+    boolean existsByNicknameAndIdNot(String nickname, UUID id);
 
     /** 매칭 신청 시 칸·정원 동시성 제어용 행 잠금 (SELECT ... FOR UPDATE) */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

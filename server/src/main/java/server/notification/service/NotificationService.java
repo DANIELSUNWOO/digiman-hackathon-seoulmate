@@ -5,6 +5,7 @@ import java.util.UUID;
 import server.global.common.Times;
 import server.global.error.ApiException;
 import server.global.error.ErrorCode;
+import server.match.repository.MatchRepository;
 import server.notification.domain.Notification;
 import server.notification.domain.NotificationType;
 import server.notification.repository.NotificationRepository;
@@ -28,15 +29,28 @@ public class NotificationService implements NotificationPublisher {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final MatchRepository matchRepository;
     private final Clock clock;
 
     @Override
     @Transactional
-    public void publish(UUID receiverId, NotificationType type, Long matchId, Object... args) {
-        User receiver = userRepository.findById(receiverId).orElse(null);
+    public void publish(UUID userId, NotificationType type, Long matchId, Object... extra) {
+        User receiver = userRepository.findById(userId).orElse(null);
         if (receiver == null || !receiver.isActive()) return;           // 탈퇴한 사람에게는 보내지 않는다
+        Object[] args = new Object[extra.length + 1];
+        args[0] = partnerNickname(matchId, userId);                     // {0} = 매칭 상대 닉네임
+        System.arraycopy(extra, 0, args, 1, extra.length);
         String message = type.format(receiver.getLanguage(), args);     // 받는 사람 언어로 (번역 API 아님)
-        notificationRepository.save(Notification.of(receiverId, type, matchId, message, LocalDateTime.now(clock)));
+        notificationRepository.save(Notification.of(userId, type, matchId, message, LocalDateTime.now(clock)));
+    }
+
+    private String partnerNickname(Long matchId, UUID receiverId) {
+        if (matchId == null) return "-";
+        return matchRepository.findById(matchId)
+                .filter(m -> m.isMember(receiverId))
+                .flatMap(m -> userRepository.findById(m.partnerOf(receiverId)))
+                .map(u -> u.getNickname() == null ? "-" : u.getNickname())
+                .orElse("-");
     }
 
     // ---------- NOTI-01 ~ 04 ----------

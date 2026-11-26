@@ -12,7 +12,7 @@ spring:
       maximum-pool-size: 5        # Supabase Session pooler 연결 수 제한
   jpa:
     hibernate:
-      ddl-auto: none              # 스키마는 Flyway(db/migration)가 관리
+      ddl-auto: validate          # 스키마는 Flyway(db/migration)가 관리. 엔티티와 DB가 다르면 서버가 안 뜬다
     open-in-view: false
     properties:
       hibernate:

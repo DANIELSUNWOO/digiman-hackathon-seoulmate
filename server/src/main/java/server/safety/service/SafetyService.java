@@ -17,8 +17,7 @@ import server.safety.domain.ReportTargetType;
 import server.safety.repository.BlockRepository;
 import server.safety.repository.ReportRepository;
 import server.user.repository.UserRepository;
-import server.visit.repository.SpotVisitRepository;
-import server.visit.repository.VisitReactionRepository;
+import server.visit.service.VisitQuery;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
@@ -40,8 +39,7 @@ public class SafetyService {
     private final MatchAccess matchAccess;
     private final ReportRepository reportRepository;
     private final BlockRepository blockRepository;
-    private final SpotVisitRepository visitRepository;
-    private final VisitReactionRepository reactionRepository;
+    private final VisitQuery visitQuery;
     private final ChatMessageRepository messageRepository;
     private final UserRepository userRepository;
     private final Clock clock;
@@ -80,13 +78,11 @@ public class SafetyService {
             // 대상자는 어차피 서버가 매칭 상대로 정하므로 PROFILE 은 targetId 를 보지 않고 matchId 를 저장한다.
             case PROFILE -> true;
             // 방문 기록은 여행자만 쓴다 → 상대가 여행자일 때만 신고 가능
-            case VISIT -> partnerId.equals(m.getTravelerId()) && visitRepository.findById(targetId)
-                    .map(v -> v.getMatchId().equals(m.getId())).orElse(false);
+            case VISIT -> visitQuery.authorOf(targetId).map(partnerId::equals).orElse(false)
+                    && visitQuery.matchIdOfVisit(targetId).map(m.getId()::equals).orElse(false);
             // 댓글은 메이트가 쓴다
-            case COMMENT -> reactionRepository.findById(targetId)
-                    .filter(r -> r.getAuthorId().equals(partnerId))
-                    .flatMap(r -> visitRepository.findById(r.getVisitId()))
-                    .map(v -> v.getMatchId().equals(m.getId())).orElse(false);
+            case COMMENT -> visitQuery.reactionAuthorOf(targetId).map(partnerId::equals).orElse(false)
+                    && visitQuery.matchIdOfReaction(targetId).map(m.getId()::equals).orElse(false);
             case CHAT -> messageRepository.findById(targetId)
                     .map(c -> c.getMatchId().equals(m.getId()) && c.getSenderId().equals(partnerId)).orElse(false);
         };

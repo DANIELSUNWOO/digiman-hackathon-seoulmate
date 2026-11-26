@@ -7,7 +7,8 @@ import server.global.common.Times;
 import server.global.common.UserSummary;
 import server.map.domain.SecretMap;
 import server.map.repository.SecretMapRepository;
-import server.map.repository.SpotRepository;
+import server.map.service.MapQuery;
+import server.visit.service.VisitQuery;
 import server.match.domain.Match;
 import server.match.domain.MatchStatus;
 import server.match.repository.MatchRepository;
@@ -30,7 +31,8 @@ public class MatchViewAssembler {
     private final UserRepository userRepository;
     private final TripRepository tripRepository;
     private final SecretMapRepository mapRepository;
-    private final SpotRepository spotRepository;
+    private final MapQuery mapQuery;
+    private final VisitQuery visitQuery;
     private final SpotVisitRepository visitRepository;
     private final AlbumRepository albumRepository;
     private final MatchRepository matchRepository;
@@ -68,8 +70,8 @@ public class MatchViewAssembler {
 
     public MatchDtos.Progress progress(Match m) {
         if (m.getCourseMapId() == null) return null;
-        return new MatchDtos.Progress(visitRepository.countByMatchId(m.getId()), m.getRequiredVisits(),
-                spotRepository.countByMapId(m.getCourseMapId()));
+        return new MatchDtos.Progress(visitQuery.countByMatch(m.getId()), m.getRequiredVisits(),
+                mapQuery.spotCount(m.getCourseMapId()));
     }
 
     public MatchDtos.Slots slotsOf(User traveler) {

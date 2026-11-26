@@ -4,8 +4,7 @@ import server.match.domain.Match;
 import server.match.repository.MatchRepository;
 import server.notification.domain.NotificationType;
 import server.notification.service.NotificationPublisher;
-import server.user.repository.UserRepository;
-import server.visit.repository.SpotVisitRepository;
+import server.visit.service.VisitQuery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -25,19 +24,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class MatchProgressService {
 
     private final MatchRepository matchRepository;
-    private final SpotVisitRepository visitRepository;
-    private final UserRepository userRepository;
+    private final VisitQuery visitQuery;
     private final NotificationPublisher notificationPublisher;
 
     @Transactional(propagation = Propagation.MANDATORY)   // 반드시 서버 B의 방문 인증 트랜잭션 안에서
     public boolean onVisitVerified(Long matchId) {
         Match m = matchRepository.findByIdForUpdate(matchId).orElseThrow();
-        long visited = visitRepository.countByMatchId(matchId);
+        long visited = visitQuery.countByMatch(matchId);
         if (!m.requestChatIfReached(visited)) return false;
-        String travelerName = userRepository.findById(m.getTravelerId()).map(u -> u.getNickname()).orElse("-");
-        String mateName = userRepository.findById(m.getMateId()).map(u -> u.getNickname()).orElse("-");
-        notificationPublisher.publish(m.getTravelerId(), NotificationType.CHAT_REQUEST, matchId, mateName);
-        notificationPublisher.publish(m.getMateId(), NotificationType.CHAT_REQUEST, matchId, travelerName);
+        notificationPublisher.publish(m.getTravelerId(), NotificationType.CHAT_REQUEST, matchId);
+        notificationPublisher.publish(m.getMateId(), NotificationType.CHAT_REQUEST, matchId);
         return true;
     }
 }

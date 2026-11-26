@@ -173,8 +173,7 @@ public class UserService {
         LocalDateTime now = LocalDateTime.now(clock);
         for (Match m : matchRepository.findMineForWithdraw(u.getId(), MatchStatus.ACTIVE)) {
             m.cancel(now);
-            notificationPublisher.publish(m.partnerOf(u.getId()), NotificationType.CANCELED, m.getId(),
-                    u.getNickname() == null ? "-" : u.getNickname());
+            notificationPublisher.publish(m.partnerOf(u.getId()), NotificationType.CANCELED, m.getId());
         }
         u.withdraw();   // 행은 지우지 않는다 (매칭·신고 기록 보존). Supabase Auth 계정 삭제는 하지 않음
     }

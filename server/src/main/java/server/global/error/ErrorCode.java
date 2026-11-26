@@ -16,7 +16,7 @@ public enum ErrorCode {
     NOT_MATCH_MEMBER(HttpStatus.FORBIDDEN, "이 매칭의 당사자가 아닙니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "대상을 찾을 수 없습니다."),
     CONFLICT(HttpStatus.CONFLICT, "지금 상태에서는 할 수 없습니다."),
-    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "파일은 5MB까지 올릴 수 있습니다."),
+    FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "파일은 5MB까지 올릴 수 있습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다."),
 
     // 회원/온보딩

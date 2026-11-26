@@ -5,8 +5,7 @@ import org.springframework.stereotype.Component;
 import server.global.config.PolicyProperties;
 import server.global.error.ApiException;
 import server.global.error.ErrorCode;
-import server.map.repository.SecretMapRepository;
-import server.map.service.MapVisibility;
+import server.map.service.MapQuery;
 import server.match.domain.MatchStatus;
 import server.match.repository.MatchRepository;
 import server.safety.repository.BlockRepository;
@@ -27,8 +26,7 @@ public class MateEligibility {
 
     private final MatchRepository matchRepository;
     private final BlockRepository blockRepository;
-    private final SecretMapRepository mapRepository;
-    private final MapVisibility mapVisibility;
+    private final MapQuery mapQuery;
     private final PolicyProperties policy;
     private final Clock clock;
 
@@ -61,7 +59,7 @@ public class MateEligibility {
     }
 
     public boolean hasPublicMap(UUID mateId) {
-        return mapRepository.findByMateIdOrderByIdAsc(mateId).stream().anyMatch(m -> mapVisibility.isPublic(m.getId()));
+        return !mapQuery.findPublicMaps(mateId).isEmpty();
     }
 
     public long activeMatchesOf(UUID mateId) {

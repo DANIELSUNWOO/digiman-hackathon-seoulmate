@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/** [서버 B 소유] 앨범. MatchCompletedEvent 를 받아 서버 B가 생성한다. */
+/** [서버 B 소유] 앨범. AlbumService.createForMatch 로 생성 */
 @Entity
 @Table(name = "albums")
 @Getter

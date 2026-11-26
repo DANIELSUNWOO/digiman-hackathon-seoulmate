@@ -1,6 +1,7 @@
-# 서울메이트 API 명세서 v1.5 (11/26)
+# 서울메이트 API 명세서 v1.6 (11/26)
 
 > 기준 문서: 요구사항정의서 v3.4, ERD v2.5
+> v1.6 변경: 서버 B 구현에 맞춰 정리. 지도·스팟 삭제 불가 조건(MAP_IN_USE)을 넓힘, 수정 API 응답 형식 명시, 차단 관계에서는 리액션·후기 불가, 상호 후기는 아직 번역하지 않음, 에러 코드 추가(MAP_NOT_FOUND, SPOT_NOT_FOUND, VISIT_NOT_FOUND, ALBUM_NOT_FOUND, ALREADY_REVIEWED). 바뀐 곳은 MAP-01·02·03·04·05, SPOT-01·02·03, VISIT-01·02·03, ALBUM-01·02, REVIEW-01·02, 6장
 > v1.5 변경: 11/25 회의 반영. 여행자 매칭 칸 무료 5칸, 차단은 양쪽 모두 언제든(사유 필수), 차단당한 쪽 피드백 API(BLOCK-03) 추가, 차단당한 쪽에는 상태를 ENDED로 표시. 바뀐 곳은 USER-01, MATCH-01·02·03·07·08, REPORT-01, BLOCK-01·03, 알림 표, 화면 매핑
 > v1.4 변경: 기술 스택 확정(Supabase + Spring Boot). 회원가입·로그인은 Supabase Auth, 이미지는 Supabase Storage에 앱이 직접 업로드. AUTH-01을 "회원 등록"으로 변경, AUTH-02·UPLOAD-01은 Supabase 사용으로 대체. 사용자 id는 uuid
 > v1.3 변경: 인증 50% 이상인데 여행 완료를 누르지 않은 매칭은 종료일이 지나면 자동 완료. 바뀐 곳은 DEV-01, MATCH-08, 알림 표, 서버 배치
@@ -420,6 +421,12 @@ const { data } = supabase.storage.from('images').getPublicUrl(path)  // data.pub
 - 캡션은 저장할 때 일본어로 번역해 둔다 (0-3).
 - title 1~30자, caption 0~300자.
 
+| 상태 | 코드 | 상황 |
+| --- | --- | --- |
+| 400 | VALIDATION_ERROR | title 비어 있음·30자 초과, caption 300자 초과 |
+| 403 | NOT_VERIFIED | 여권 인증 전 |
+| 403 | ROLE_FORBIDDEN | 여행자가 호출 |
+
 #### MAP-02 내 지도 목록
 `GET /maps/me` · 메이트 · F-13, F-UI-15
 
@@ -439,7 +446,8 @@ const { data } = supabase.storage.from('images').getPublicUrl(path)  // data.pub
 ```
 
 - `isPublic` = 스팟 5곳 이상 + 공개 스팟 2곳 (F-13). false면 메이트 홈에 "스팟 4 / 5"처럼 표시.
-- `inUse` = 진행 중인 매칭의 코스 지도인지. true면 삭제 버튼을 막는다.
+- `inUse` = 진행 중인 매칭(MATCHED·ON_COURSE)의 코스 지도인지. true면 삭제 버튼을 막는다.
+- `inUse`가 false여도 **예전에 코스로 쓰였거나 방문 기록이 있는 지도는 삭제할 수 없다** (MAP-05). 앱은 삭제 요청의 409 `MAP_IN_USE`도 처리해야 한다.
 
 #### MAP-03 내 지도 상세
 `GET /maps/{mapId}` · 메이트(작성자)
@@ -469,17 +477,23 @@ const { data } = supabase.storage.from('images').getPublicUrl(path)  // data.pub
 }
 ```
 
-- 작성자가 아니면 403 `NOT_MAP_OWNER`.
+- 작성자가 아니면 403 `NOT_MAP_OWNER`, 지도가 없으면 404 `MAP_NOT_FOUND`.
+- 스팟은 `sortOrder`(등록 순) 순서로 내려간다.
 
 #### MAP-04 / MAP-05 지도 수정·삭제
-`PATCH /maps/{mapId}` (title, caption) · `DELETE /maps/{mapId}` → 204 · F-14
+`PATCH /maps/{mapId}` (title, caption 중 보낸 것만) → 200 · `DELETE /maps/{mapId}` → 204 · F-14
+
+- PATCH 응답은 MAP-03(내 지도 상세)과 같은 형태다.
+- 캡션을 수정하면 번역을 비우고 다시 한다.
+- 지도를 지우면 그 지도의 스팟·사진도 함께 지워진다.
+- **삭제할 수 없는 지도**: 한 번이라도 코스로 선택된 지도(취소·만료·완료된 매칭 포함)이거나, 스팟에 방문 기록이 있는 지도. 끝난 매칭과 방문 기록이 이 지도를 계속 가리키고 있기 때문이다.
 
 | 상태 | 코드 | 상황 |
 | --- | --- | --- |
+| 400 | VALIDATION_ERROR | title을 빈 값으로 보냄, 길이 초과 |
 | 403 | NOT_MAP_OWNER | 작성자가 아님 |
-| 409 | MAP_IN_USE | 진행 중인 매칭의 코스 지도라 삭제 불가 |
-
-- 캡션을 수정하면 번역도 다시 한다.
+| 404 | MAP_NOT_FOUND | 지도가 없음 |
+| 409 | MAP_IN_USE | 코스로 쓰였거나 방문 기록이 있어 삭제 불가 |
 
 #### MAP-06 공개 스팟 지정
 `PUT /maps/{mapId}/previews` · 메이트(작성자) · F-12
@@ -520,13 +534,27 @@ const { data } = supabase.storage.from('images').getPublicUrl(path)  // data.pub
 
 | 상태 | 코드 | 상황 |
 | --- | --- | --- |
-| 400 | VALIDATION_ERROR | 이름·좌표 누락 |
+| 400 | VALIDATION_ERROR | 이름·좌표 누락, 사진 6장 이상, 글자 수 초과 |
 | 400 | PHOTO_REQUIRED | 사진 0장 |
+| 400 | INVALID_TAG | 없는 tagId |
 | 403 | NOT_MAP_OWNER | 작성자가 아님 |
+| 404 | MAP_NOT_FOUND | 지도가 없음 |
 
 #### SPOT-02 / SPOT-03 스팟 수정·삭제
-`PATCH /spots/{spotId}` (SPOT-01의 필드 중 보낸 것만) · `DELETE /spots/{spotId}` → 204 · F-14
-에러는 MAP-04/05와 같다. 공개 스팟을 삭제하면 그 지도는 다시 공개 스팟을 지정할 때까지 `isPublic = false`가 된다.
+`PATCH /spots/{spotId}` (SPOT-01의 필드 중 보낸 것만) → 200 · `DELETE /spots/{spotId}` → 204 · F-14
+
+- PATCH 응답은 MAP-03의 `spots` 항목 하나와 같은 형태다.
+- `photoUrls`를 보내면 사진 전체가 그 목록으로 바뀐다. 빈 목록은 400 `PHOTO_REQUIRED`.
+- reason·review를 수정하면 그 글의 번역을 비우고 다시 한다.
+- 공개 스팟을 삭제하면 그 지도는 다시 공개 스팟을 지정할 때까지 `isPublic = false`가 된다.
+- **삭제할 수 없는 스팟**: 진행 중인 매칭의 코스 지도에 있는 스팟, 방문 기록이 있는 스팟.
+
+| 상태 | 코드 | 상황 |
+| --- | --- | --- |
+| 400 | PHOTO_REQUIRED | 사진을 빈 목록으로 보냄 |
+| 403 | NOT_MAP_OWNER | 작성자가 아님 |
+| 404 | SPOT_NOT_FOUND | 스팟이 없음 |
+| 409 | MAP_IN_USE | 진행 중인 코스이거나 방문 기록이 있어 삭제 불가 |
 
 ---
 
@@ -791,6 +819,8 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 | 400 | OUT_OF_RANGE | 반경 200m 밖. 앱은 "스팟 근처에서 다시 시도해 주세요" 안내 |
 | 400 | SPOT_NOT_IN_COURSE | 코스 지도의 스팟이 아님 |
 | 400 | VALIDATION_ERROR | 사진·후기 누락, 후기 500자 초과 |
+| 403 | ROLE_FORBIDDEN | 메이트가 호출 |
+| 403 | NOT_MATCH_MEMBER | 이 매칭의 여행자가 아님 |
 | 409 | ALREADY_VISITED | 이미 인증한 스팟 |
 | 409 | MATCH_NOT_ON_COURSE | 코스 선택 전이거나 끝난 매칭 |
 
@@ -814,6 +844,8 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 ```
 
 - 위치 정보는 어떤 형태로도 내려주지 않는다.
+- 리액션은 남긴 순서대로 들어 있다. 이모지만 남긴 리액션은 `comment`가 `null`.
+- 당사자가 아니면 403 `NOT_MATCH_MEMBER`.
 
 #### VISIT-03 리액션·댓글
 `POST /visits/{visitId}/reactions` · 메이트(당사자) · F-28
@@ -829,9 +861,11 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 
 | 상태 | 코드 | 상황 |
 | --- | --- | --- |
-| 400 | VALIDATION_ERROR | 둘 다 비어 있음, 댓글 300자 초과 |
+| 400 | VALIDATION_ERROR | 둘 다 비어 있음, 댓글 300자 초과, 이모지 20자 초과 |
 | 403 | ROLE_FORBIDDEN | 여행자가 호출 |
 | 403 | NOT_MATCH_MEMBER | 이 매칭의 메이트가 아님 |
+| 404 | VISIT_NOT_FOUND | 방문 기록이 없음 |
+| 409 | MATCH_NOT_ACTIVE | 차단된 매칭, 또는 여행 완료 뒤 어느 한쪽이 차단함 |
 
 #### CHAT-01 채팅 열기 수락/거절
 `POST /matches/{matchId}/chat/accept` · 당사자 · F-29, F-30
@@ -899,25 +933,41 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 ```
 
 - 앨범 내용은 따로 저장하지 않고 방문 기록과 리액션을 모아서 보여 준다.
-- 앨범이 없으면 404 `ALBUM_NOT_FOUND`.
+- 앨범이 없으면(여행 완료 전) 404 `ALBUM_NOT_FOUND`.
+- 차단된 뒤에도 앨범은 그대로 볼 수 있다.
 
 #### ALBUM-02 앨범 수정
-`PATCH /matches/{matchId}/album` · 여행자(당사자) · `title`, `coverUrl` 중 보낸 것만 수정
+`PATCH /matches/{matchId}/album` · 여행자(당사자) · `title`, `coverUrl` 중 보낸 것만 수정 → 200, 응답은 ALBUM-01과 같은 형태
+
+| 상태 | 코드 | 상황 |
+| --- | --- | --- |
+| 400 | VALIDATION_ERROR | 빈 값으로 보냄, title 100자 초과 |
+| 403 | ROLE_FORBIDDEN | 메이트가 호출 |
+| 404 | ALBUM_NOT_FOUND | 앨범이 없음 |
 
 #### REVIEW-01 / REVIEW-02 상호 후기
 `POST /matches/{matchId}/reviews`, `GET /matches/{matchId}/reviews` · 당사자 · F-34
 
 ```json
-// POST 요청 (받는 사람은 서버가 매칭 상대로 자동 지정)
+// POST 요청 (받는 사람은 서버가 매칭 상대로 자동 지정, content는 생략 가능)
 { "rating": 5, "content": "おかげで最高の旅になりました" }
-// GET 응답 200
-[ { "reviewer": { UserSummary }, "rating": 5, "content": { ... }, "createdAt": "..." } ]
+// POST 응답 201
+{ "reviewId": 12 }
+// GET 응답 200 (작성 순)
+[ { "reviewId": 12, "reviewer": { UserSummary }, "rating": 5,
+    "content": { "original": "おかげで最高の旅になりました", "translated": null, "sourceLang": "ja" },
+    "createdAt": "..." } ]
 ```
+
+- **후기는 아직 번역하지 않는다.** `reviews` 테이블에 번역 칸이 없어서 `translated`는 항상 `null`이다 (6장 7번). 앱은 원문을 보여 준다.
+- content를 생략하면 `content`는 `null`.
 
 | 상태 | 코드 | 상황 |
 | --- | --- | --- |
 | 400 | VALIDATION_ERROR | rating이 1~5 아님, 내용 300자 초과 |
+| 403 | NOT_MATCH_MEMBER | 당사자가 아님 |
 | 409 | MATCH_NOT_COMPLETED | 여행 완료 전 |
+| 409 | MATCH_NOT_ACTIVE | 여행 완료 뒤 어느 한쪽이 차단함 |
 | 409 | ALREADY_REVIEWED | 이미 작성함 |
 
 ---
@@ -1122,6 +1172,7 @@ API를 새로 만들지 않고 MATE-01의 `matchReason`을 채운다. 목록 전
 | 4 | AI 코스 추천에 어떤 스팟을 쓰나? | **비밀지도의 숨겨진 스팟을 쓰면 '비밀'이 깨진다.** 공개 스팟(각 지도의 2곳)만 후보로 쓰는 것을 제안 |
 | 5 | 지도 SDK는 무엇을 쓰나? | 기술 스택 회의에서 함께 결정. 한국 장소 데이터는 Google보다 네이버·카카오가 정확한 편이라 비교가 필요하다 |
 | 6 | 매칭 조건을 바꾸면 목록이 바로 바뀌나? | **확정**: 바로 바뀐다 (하루 1회 규칙이 없어짐) |
+| 7 | 상호 후기도 번역하나? | 지금은 원문만 내려간다. 번역하려면 `reviews.content_translated` 컬럼을 마이그레이션으로 추가해야 한다 (서버 A와 결정 필요) |
 
 ---
 

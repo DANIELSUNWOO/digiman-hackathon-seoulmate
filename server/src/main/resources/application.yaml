@@ -53,3 +53,7 @@ seoulmate:
     max-match-slots: 5          # 여행자 무료 매칭 칸 (ERD v2.5)
     max-tags: 10
     min-age: 18
+
+server:
+  port: ${PORT:8080}                # 배포 서비스가 PORT 를 주면 그 번호로 (Render 등)
+  forward-headers-strategy: framework  # 앞단 HTTPS 프록시 뒤에서도 Swagger 주소가 https 로 나오게

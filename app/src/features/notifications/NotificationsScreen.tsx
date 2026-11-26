@@ -1,4 +1,4 @@
-// C-01 알림 목록. 홈의 진입 버튼과 안 읽음 배지는 Q-16에서 붙인다.
+// C-01 알림 목록. 홈에서는 NotificationBell로 들어온다.
 import type { ReactElement } from "react";
 import { ActivityIndicator } from "react-native";
 import { theme } from "../../theme";

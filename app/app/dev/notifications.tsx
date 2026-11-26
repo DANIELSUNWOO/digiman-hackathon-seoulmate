@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   destinationFor,
+  NotificationBell,
   NotificationsScreen,
   type NotificationLang,
 } from "../../src/features/notifications";
@@ -54,6 +55,12 @@ export default function DevNotifications(): ReactElement {
             onPress={() => setScenario(value)}
           />
         ))}
+        <NotificationBell
+          key={`${scenario}-${lang}`}
+          api={api}
+          lang={lang}
+          onPress={() => setOpened("종")}
+        />
         <Label language="ko">{`마지막 이동: ${opened}`}</Label>
       </View>
       <View key={`${scenario}-${lang}`} style={{ flex: 1 }}>

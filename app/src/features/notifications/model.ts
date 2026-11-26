@@ -56,6 +56,12 @@ export function mayHaveUnread({
   return !allRead && nextCursor !== null;
 }
 
+/** 배지에 쓸 숫자. 안 읽은 알림이 없으면 null */
+export function badgeLabel(count: number): string | null {
+  if (count <= 0) return null;
+  return count > 99 ? "99+" : String(count);
+}
+
 /** 서버가 KST(+09:00)로 내려주므로 문자열에서 잘라 쓴다. */
 export function timeLabel(createdAt: string): string {
   const month = createdAt.slice(5, 7);

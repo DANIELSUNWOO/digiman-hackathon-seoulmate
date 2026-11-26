@@ -90,8 +90,8 @@ class VisitServiceIntegrationTest {
             spotIds.add(spotRepository.save(s).getId());
         }
         Trip trip = tripRepository.save(Trip.of(traveler.getId(), today, today.plusDays(3), now));
-        Match m = Match.create(trip.getId(), traveler.getId(), mate.getId(), now);
-        if (courseSelected) m.selectCourse(map.getId(), 3, now);
+        // API v1.7: 지도 선택 = 매칭 + 코스 확정 (코스 선택 전 상태는 없음)
+        Match m = Match.create(trip.getId(), traveler.getId(), mate.getId(), map.getId(), 3, now);
         m = matchRepository.save(m);
         return new Fixture(traveler, mate, m.getId(), map.getId(), spotIds);
     }
@@ -130,10 +130,11 @@ class VisitServiceIntegrationTest {
         // 4번째 인증은 이미 요청된 상태라 다시 요청하지 않는다
         assertThat(visitService.verify(traveler, f.matchId(), near(f.spotIds().get(3))).chatReady()).isFalse();
 
-        assertThat(matchRepository.findById(f.matchId()).orElseThrow().getChatStatus()).isEqualTo(ChatStatus.REQUESTED);
+        // API v1.7: READY 가 되면 여행자에게만 CHAT_READY (여행자가 바로 연다)
+        assertThat(matchRepository.findById(f.matchId()).orElseThrow().getChatStatus()).isEqualTo(ChatStatus.READY);
         assertThat(notificationsOf(f.mate())).filteredOn(t -> t == NotificationType.VISIT).hasSize(4);
-        assertThat(notificationsOf(f.mate())).filteredOn(t -> t == NotificationType.CHAT_REQUEST).hasSize(1);
-        assertThat(notificationsOf(f.traveler())).filteredOn(t -> t == NotificationType.CHAT_REQUEST).hasSize(1);
+        assertThat(notificationsOf(f.mate())).filteredOn(t -> t == NotificationType.CHAT_READY).isEmpty();
+        assertThat(notificationsOf(f.traveler())).filteredOn(t -> t == NotificationType.CHAT_READY).hasSize(1);
 
         // 메이트도 목록을 본다. 최근 인증 순
         var list = visitService.list(auth(f.mate()), f.matchId());
@@ -177,13 +178,9 @@ class VisitServiceIntegrationTest {
 
     @Test
     void 코스_선택_전이나_끝난_매칭은_인증할_수_없다() {
-        Fixture before = fixture(false);
-        assertError(() -> visitService.verify(auth(before.traveler()), before.matchId(), near(before.spotIds().get(0))),
-                ErrorCode.MATCH_NOT_ON_COURSE);
-
         Fixture canceled = fixture(true);
         Match m = matchRepository.findById(canceled.matchId()).orElseThrow();
-        m.cancel(now);
+        m.cancel(m.getTravelerId(), null, null, now);
         matchRepository.save(m);
         assertError(() -> visitService.verify(auth(canceled.traveler()), canceled.matchId(), near(canceled.spotIds().get(0))),
                 ErrorCode.MATCH_NOT_ON_COURSE);

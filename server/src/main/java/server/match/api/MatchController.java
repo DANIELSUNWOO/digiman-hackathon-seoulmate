@@ -23,18 +23,19 @@ public class MatchController {
     private final MatchService matchService;
     private final CourseService courseService;
 
-    @Operation(summary = "MATCH-01 매칭 신청 (메이트 찾기 목록에서 1명, mateId)")
+    @Operation(summary = "MATCH-01 지도 선택 = 매칭 + 코스 확정 (mapId)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public MatchDtos.ApplyResponse apply(AuthUser me, @Valid @RequestBody MatchDtos.ApplyRequest req) {
         Guards.requireTraveler(me);
-        return matchService.apply(me, req.mateId());
+        return matchService.apply(me, req.mapId());
     }
 
-    @Operation(summary = "MATCH-02 내 매칭 목록 (state=active|ended)")
+    @Operation(summary = "MATCH-02 내 매칭 목록 (state=active|ended, mapId=지도별 대화 목록)")
     @GetMapping
-    public List<MatchDtos.MatchItem> list(AuthUser me, @RequestParam(required = false) String state) {
-        return matchService.list(me, state);
+    public List<MatchDtos.MatchItem> list(AuthUser me, @RequestParam(required = false) String state,
+                                          @RequestParam(required = false) Long mapId) {
+        return matchService.list(me, state, mapId);
     }
 
     @Operation(summary = "MATCH-03 매칭 상세")
@@ -43,29 +44,17 @@ public class MatchController {
         return matchService.detail(me, matchId);
     }
 
-    @Operation(summary = "MATCH-04 메이트 지도 목록 (캡션 + 공개 스팟 2곳만)")
-    @GetMapping("/{matchId}/maps")
-    public List<server.map.service.MapQuery.PublicMap> mateMaps(AuthUser me, @PathVariable Long matchId) {
-        return courseService.mateMaps(me, matchId);
-    }
-
-    @Operation(summary = "MATCH-05 코스 지도 선택 → 여행 시작")
-    @PostMapping("/{matchId}/course")
-    public MatchDtos.CourseSelected selectCourse(AuthUser me, @PathVariable Long matchId,
-                                                 @Valid @RequestBody MatchDtos.CourseRequest req) {
-        return courseService.selectCourse(me, matchId, req.mapId());
-    }
-
     @Operation(summary = "MATCH-06 코스 지도 (스팟 전체 + 스탬프)")
     @GetMapping("/{matchId}/course")
     public MatchDtos.CourseView course(AuthUser me, @PathVariable Long matchId) {
         return courseService.course(me, matchId);
     }
 
-    @Operation(summary = "MATCH-07 매칭 취소 (여행자만)")
+    @Operation(summary = "MATCH-07 매칭 끊기 (여행자·메이트, 사유 선택)")
     @PostMapping("/{matchId}/cancel")
-    public MatchDtos.CancelResponse cancel(AuthUser me, @PathVariable Long matchId) {
-        return matchService.cancel(me, matchId);
+    public MatchDtos.CancelResponse cancel(AuthUser me, @PathVariable Long matchId,
+                                           @Valid @RequestBody(required = false) MatchDtos.CancelRequest req) {
+        return matchService.cancel(me, matchId, req);
     }
 
     @Operation(summary = "MATCH-08 여행 완료 + 앨범 생성")

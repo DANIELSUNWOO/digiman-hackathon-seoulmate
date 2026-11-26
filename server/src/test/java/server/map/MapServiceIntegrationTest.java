@@ -214,8 +214,7 @@ class MapServiceIntegrationTest {
 
         User traveler = user("JP", true);
         Trip trip = tripRepository.save(Trip.of(traveler.getId(), today, today.plusDays(3), now));
-        Match match = Match.create(trip.getId(), traveler.getId(), mate.getId(), now);
-        match.selectCourse(mapId, 3, now);
+        Match match = Match.create(trip.getId(), traveler.getId(), mate.getId(), mapId, 3, now);
         match = matchRepository.save(match);
 
         var traveling = mapService.myMaps(me).get(0);
@@ -233,7 +232,7 @@ class MapServiceIntegrationTest {
         assertThat(mapService.addSpot(me, mapId, spot("새 장소")).spotCount()).isEqualTo(6);
 
         // 여행이 끝나면 잠금이 풀린다. 단, matches.course_map_id 가 지도를 가리키므로 지도 삭제는 계속 막는다
-        match.cancel(now);
+        match.cancel(match.getTravelerId(), null, null, now);
         matchRepository.save(match);
         var ended = mapService.myMaps(me).get(0);
         assertThat(ended.inUse()).isFalse();

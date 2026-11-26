@@ -136,7 +136,7 @@ public class UserService {
     }
 
     private void checkNickname(String nickname, UUID userId) {
-        if (nickname.length() < 2 || nickname.length() > 12) throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        if (nickname.length() < 2 || nickname.length() > 8) throw new ApiException(ErrorCode.VALIDATION_ERROR);
         if (userRepository.existsByNicknameAndIdNot(nickname, userId)) throw new ApiException(ErrorCode.NICKNAME_DUPLICATED);
     }
 
@@ -172,7 +172,7 @@ public class UserService {
         User u = load(me);
         LocalDateTime now = LocalDateTime.now(clock);
         for (Match m : matchRepository.findMineForWithdraw(u.getId(), MatchStatus.ACTIVE)) {
-            m.cancel(now);
+            m.cancel(u.getId(), null, null, now);
             notificationPublisher.publish(m.partnerOf(u.getId()), NotificationType.CANCELED, m.getId());
         }
         u.withdraw();   // 행은 지우지 않는다 (매칭·신고 기록 보존). Supabase Auth 계정 삭제는 하지 않음

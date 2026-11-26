@@ -83,6 +83,9 @@ public enum ErrorCode {
     PREVIEW_COUNT_INVALID(HttpStatus.BAD_REQUEST, "공개 스팟은 정확히 2곳을 골라 주세요."),
     SPOT_NOT_IN_MAP(HttpStatus.BAD_REQUEST, "이 지도의 스팟이 아닙니다."),
     PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "사진을 1장 이상 올려 주세요."),
+    MAP_ALREADY_SELECTED(HttpStatus.CONFLICT, "이미 고른 지도입니다."),
+    MAP_LOCKED(HttpStatus.CONFLICT, "지금 이 지도로 여행 중인 여행자가 있어서 수정할 수 없어요."),
+    PREVIEW_SPOT_LOCKED(HttpStatus.CONFLICT, "공개 스팟은 수정할 수 없어요. 다른 곳을 공개로 바꾼 뒤 수정해 주세요."),
 
     // 앨범·후기 (서버 B)
     ALBUM_NOT_FOUND(HttpStatus.NOT_FOUND, "앨범이 아직 없습니다."),

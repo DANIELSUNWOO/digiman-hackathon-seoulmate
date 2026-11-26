@@ -32,6 +32,11 @@ springdoc:
 
 seoulmate:
   demo-mode: ${DEMO_MODE:false}
+  llm:                          # AI 번역 (서버 B). 키가 비어 있으면 번역을 건너뛴다
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:gpt-5.4-nano}
+    base-url: https://api.openai.com/v1
+    timeout-seconds: 20
   supabase:
     issuer: ${SUPABASE_JWT_ISSUER}
     jwks-url: ${SUPABASE_JWKS_URL}

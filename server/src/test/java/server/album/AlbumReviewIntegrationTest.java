@@ -27,6 +27,7 @@ import server.user.domain.Gender;
 import server.user.domain.User;
 import server.user.repository.UserRepository;
 import server.visit.service.VisitService;
+import server.visit.service.VisitService.CommentRequest;
 import server.visit.service.VisitService.ReactionRequest;
 import server.visit.service.VisitService.VisitRequest;
 
@@ -182,7 +183,9 @@ class AlbumReviewIntegrationTest {
         // 완료 뒤 차단: 매칭 상태는 COMPLETED 로 남고 차단 관계만 저장된다 (서버 A BLOCK-01)
         blockRepository.save(Block.of(f.traveler().getId(), f.mate().getId(), f.matchId(), ReportReason.ABUSIVE, null, now));
 
-        assertError(() -> visitService.react(auth(f.mate()), visitId, new ReactionRequest("❤️", null)),
+        assertError(() -> visitService.setReaction(auth(f.mate()), visitId, new ReactionRequest("LIKE")),
+                ErrorCode.MATCH_NOT_ACTIVE);
+        assertError(() -> visitService.comment(auth(f.mate()), visitId, new CommentRequest("안녕")),
                 ErrorCode.MATCH_NOT_ACTIVE);
         assertError(() -> albumReviewService.review(auth(f.mate()), f.matchId(), new ReviewRequest(1, null)),
                 ErrorCode.MATCH_NOT_ACTIVE);

@@ -3,6 +3,7 @@ package server.map.domain;
 import java.util.UUID;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.DynamicUpdate;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 /** [서버 B 소유] 비밀지도. 서버 A는 코스 선택·지도 목록에서 읽기만 한다. */
 @Entity
 @Table(name = "secret_maps")
+@DynamicUpdate   // 바뀐 칸만 UPDATE: 번역 저장과 사용자 수정이 겹쳐도 서로의 값을 덮지 않는다
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SecretMap {

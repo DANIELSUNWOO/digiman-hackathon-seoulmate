@@ -47,5 +47,21 @@ public class VisitReaction {
         return r;
     }
 
+    /** 리액션 행: emoji 에 LIKE·LAUGH·CHEER 중 하나 (방문 기록당 1개, API v1.7 VISIT-03) */
+    public static VisitReaction reaction(Long visitId, UUID authorId, String type, LocalDateTime now) {
+        return of(visitId, authorId, type, null, now);
+    }
+
+    /** 댓글 행: comment 만 있다 (API v1.7 VISIT-05) */
+    public static VisitReaction comment(Long visitId, UUID authorId, String content, LocalDateTime now) {
+        return of(visitId, authorId, null, content, now);
+    }
+
+    public boolean isReaction() { return emoji != null; }
+
+    public boolean isComment() { return comment != null; }
+
+    public void changeReaction(String type) { this.emoji = type; }
+
     public void fillTranslation(String translated) { this.commentTranslated = translated; }
 }

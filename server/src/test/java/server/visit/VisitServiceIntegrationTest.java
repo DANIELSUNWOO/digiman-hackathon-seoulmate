@@ -25,6 +25,7 @@ import server.user.domain.User;
 import server.user.repository.UserRepository;
 import server.visit.repository.SpotVisitRepository;
 import server.visit.service.VisitService;
+import server.visit.service.VisitService.CommentRequest;
 import server.visit.service.VisitService.ReactionRequest;
 import server.visit.service.VisitService.VisitRequest;
 
@@ -115,16 +116,16 @@ class VisitServiceIntegrationTest {
         assertThat(first.progress().visited()).isEqualTo(1);
         assertThat(first.progress().required()).isEqualTo(3);
         assertThat(first.progress().total()).isEqualTo(5);
-        assertThat(first.chatRequested()).isFalse();
+        assertThat(first.chatReady()).isFalse();
         assertThat(first.verifiedAt().getOffset().getTotalSeconds()).isEqualTo(9 * 3600);
 
-        assertThat(visitService.verify(traveler, f.matchId(), near(f.spotIds().get(1))).chatRequested()).isFalse();
+        assertThat(visitService.verify(traveler, f.matchId(), near(f.spotIds().get(1))).chatReady()).isFalse();
         var third = visitService.verify(traveler, f.matchId(), near(f.spotIds().get(2)));
-        assertThat(third.chatRequested()).isTrue();
+        assertThat(third.chatReady()).isTrue();
         assertThat(third.progress().visited()).isEqualTo(3);
 
         // 4번째 인증은 이미 요청된 상태라 다시 요청하지 않는다
-        assertThat(visitService.verify(traveler, f.matchId(), near(f.spotIds().get(3))).chatRequested()).isFalse();
+        assertThat(visitService.verify(traveler, f.matchId(), near(f.spotIds().get(3))).chatReady()).isFalse();
 
         assertThat(matchRepository.findById(f.matchId()).orElseThrow().getChatStatus()).isEqualTo(ChatStatus.REQUESTED);
         assertThat(notificationsOf(f.mate())).filteredOn(t -> t == NotificationType.VISIT).hasSize(4);
@@ -137,7 +138,8 @@ class VisitServiceIntegrationTest {
         assertThat(list.get(0).spot().spotId()).isEqualTo(f.spotIds().get(3));
         assertThat(list.get(0).spot().name()).isEqualTo("스팟3");
         assertThat(list.get(0).review().sourceLang()).isEqualTo("ja");
-        assertThat(list.get(0).reactions()).isEmpty();
+        assertThat(list.get(0).reaction()).isNull();
+        assertThat(list.get(0).comments()).isEmpty();
     }
 
     @Test
@@ -185,26 +187,37 @@ class VisitServiceIntegrationTest {
     }
 
     @Test
-    void 메이트가_리액션을_남기면_여행자에게_알림이_가고_목록에_붙는다() {
+    void 리액션은_하나만_바꾸고_해제하고_댓글은_따로_쌓인다() {
         Fixture f = fixture(true);
         Long visitId = visitService.verify(auth(f.traveler()), f.matchId(), near(f.spotIds().get(0))).visitId();
         AuthUser mate = auth(f.mate());
 
-        Long reactionId = visitService.react(mate, visitId, new ReactionRequest("❤️", " 거기 창가 최고죠! ")).reactionId();
-        visitService.react(mate, visitId, new ReactionRequest("👍", null));
+        assertThat(visitService.setReaction(mate, visitId, new ReactionRequest("LIKE")).reaction()).isEqualTo("LIKE");
+        visitService.setReaction(mate, visitId, new ReactionRequest(" cheer "));        // 바꾸기
+        Long commentId = visitService.comment(mate, visitId, new CommentRequest(" 거기 창가 최고죠! ")).commentId();
+        visitService.comment(mate, visitId, new CommentRequest("다음엔 2층도 가 보세요"));
 
-        var reactions = visitService.list(auth(f.traveler()), f.matchId()).get(0).reactions();
-        assertThat(reactions).hasSize(2);
-        assertThat(reactions.get(0).reactionId()).isEqualTo(reactionId);
-        assertThat(reactions.get(0).comment().original()).isEqualTo("거기 창가 최고죠!");
-        assertThat(reactions.get(0).comment().sourceLang()).isEqualTo("ko");
-        assertThat(reactions.get(1).comment()).isNull();
-        assertThat(notificationsOf(f.traveler())).filteredOn(t -> t == NotificationType.REACTION).hasSize(2);
+        var item = visitService.list(auth(f.traveler()), f.matchId()).get(0);
+        assertThat(item.reaction()).isEqualTo("CHEER");                                  // 하나만 남는다
+        assertThat(item.comments()).hasSize(2);
+        assertThat(item.comments().get(0).commentId()).isEqualTo(commentId);
+        assertThat(item.comments().get(0).content().original()).isEqualTo("거기 창가 최고죠!");
+        assertThat(item.comments().get(0).content().sourceLang()).isEqualTo("ko");
+        // 알림: 처음 리액션 1번 + 댓글 2번 (바꾸기는 알리지 않음)
+        assertThat(notificationsOf(f.traveler())).filteredOn(t -> t == NotificationType.REACTION).hasSize(3);
 
-        assertError(() -> visitService.react(mate, visitId, new ReactionRequest(" ", null)), ErrorCode.VALIDATION_ERROR);
-        assertError(() -> visitService.react(auth(f.traveler()), visitId, new ReactionRequest("❤️", null)), ErrorCode.ROLE_FORBIDDEN);
+        visitService.clearReaction(mate, visitId);
+        visitService.clearReaction(mate, visitId);                                       // 이미 없어도 그대로
+        var cleared = visitService.list(auth(f.mate()), f.matchId()).get(0);
+        assertThat(cleared.reaction()).isNull();
+        assertThat(cleared.comments()).hasSize(2);                                       // 댓글은 그대로
+
+        assertError(() -> visitService.setReaction(mate, visitId, new ReactionRequest("HEART")), ErrorCode.VALIDATION_ERROR);
+        assertError(() -> visitService.setReaction(mate, visitId, new ReactionRequest(null)), ErrorCode.VALIDATION_ERROR);
+        assertError(() -> visitService.comment(mate, visitId, new CommentRequest("  ")), ErrorCode.VALIDATION_ERROR);
+        assertError(() -> visitService.setReaction(auth(f.traveler()), visitId, new ReactionRequest("LIKE")), ErrorCode.ROLE_FORBIDDEN);
         Fixture other = fixture(true);
-        assertError(() -> visitService.react(auth(other.mate()), visitId, new ReactionRequest("❤️", null)), ErrorCode.NOT_MATCH_MEMBER);
-        assertError(() -> visitService.react(mate, -1L, new ReactionRequest("❤️", null)), ErrorCode.VISIT_NOT_FOUND);
+        assertError(() -> visitService.comment(auth(other.mate()), visitId, new CommentRequest("안녕")), ErrorCode.NOT_MATCH_MEMBER);
+        assertError(() -> visitService.setReaction(mate, -1L, new ReactionRequest("LIKE")), ErrorCode.VISIT_NOT_FOUND);
     }
 }

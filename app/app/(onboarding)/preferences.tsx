@@ -46,7 +46,7 @@ const genders: { value: GenderPreference; label: string }[] = [
 const empty: PreferenceSelection = { genderPref: null, ageGroups: [] };
 export default function PreferencesScreen() {
   const { from } = useLocalSearchParams<{ from?: string }>();
-  const origin = from === "account" ? from : "onboarding";
+  const origin = from === "account" || from === "explore" ? from : "onboarding";
   const router = useRouter(),
     navigation = useNavigation(),
     dismiss = useOnboardingDismiss();
@@ -146,7 +146,11 @@ export default function PreferencesScreen() {
     controller.current?.abort();
     saving.current = false;
     dismiss(
-      origin === "account" ? "/account" : "/(onboarding)/tags?from=onboarding",
+      origin === "account"
+        ? "/account"
+        : origin === "explore"
+          ? "/explore"
+          : "/(onboarding)/tags?from=onboarding",
     );
     return true;
   }
@@ -205,6 +209,7 @@ export default function PreferencesScreen() {
         }
         clearPreferenceDraft(userId);
         if (origin === "account") dismiss("/account");
+        else if (origin === "explore") dismiss("/explore");
         else router.replace("/(onboarding)/trip?from=onboarding");
         return;
       }

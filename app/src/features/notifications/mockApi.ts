@@ -22,11 +22,6 @@ const SAMPLES: { type: string; ko: string; ja: string }[] = [
     ja: "ソウルさんが訪問記録にリアクションしました。",
   },
   {
-    type: "CHAT_REQUEST",
-    ko: "はるか님과 채팅을 열 수 있어요. 수락해 주세요.",
-    ja: "ソウルさんとチャットを開けます。承認してください。",
-  },
-  {
     type: "CHAT_READY",
     ko: "はるか님과 채팅을 열 수 있어요.",
     ja: "ソウルさんとチャットを開けます。",

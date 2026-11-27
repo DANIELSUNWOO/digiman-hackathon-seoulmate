@@ -18,13 +18,11 @@ import { timeLabel } from "./model";
 import { strings } from "./strings";
 import type { NotificationItem, NotificationLang } from "./types";
 
-// 서버는 CHAT_REQUEST를, API 명세 v1.7은 CHAT_READY를 쓴다.
 const ICONS = new Map<string, Icon>([
   ["MATCHED", UserPlus],
   ["CANCELED", XCircle],
   ["VISIT", MapPin],
   ["REACTION", Heart],
-  ["CHAT_REQUEST", ChatCircleDots],
   ["CHAT_READY", ChatCircleDots],
   ["CHAT_OPEN", ChatCircle],
   ["EXPIRED", Hourglass],

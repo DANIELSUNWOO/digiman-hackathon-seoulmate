@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Pressable, Text } from "react-native";
 import { useRole } from "../src/state";
 import { useSession } from "../src/session";
-import { nextStep } from "../src/users";
+import { nextStep, onboardingRouteFor } from "../src/users";
 import { errorMessage, noticeMessage } from "../src/authMessages";
 import { Button, Label, Screen } from "../src/ui";
 import { theme } from "../src/theme";
@@ -164,7 +164,28 @@ export default function Account() {
               ? `역할: ${load.me.role === "MATE" ? "메이트" : "여행자"}`
               : `役割: ${load.me.role === "MATE" ? "メイト" : "旅行者"}`}
           </Label>
-          {nextStep(load.me) ? (
+          {load.me.nickname && (
+            <Label language={language}>
+              {ko
+                ? `닉네임: ${load.me.nickname}`
+                : `ニックネーム: ${load.me.nickname}`}
+            </Label>
+          )}
+          {nextStep(load.me) === "verification" ? (
+            <Button
+              language={language}
+              disabled={locked}
+              label={ko ? "본인 인증 시작하기" : "本人確認を始める"}
+              onPress={() => router.push(onboardingRouteFor("verification"))}
+            />
+          ) : nextStep(load.me) === "profile" ? (
+            <Button
+              language={language}
+              disabled={locked}
+              label={ko ? "프로필 등록하기" : "プロフィールを登録する"}
+              onPress={() => router.push(onboardingRouteFor("profile"))}
+            />
+          ) : nextStep(load.me) ? (
             <Label language={language}>
               {ko
                 ? `다음 단계: ${{ verification: "본인 인증", profile: "프로필 등록", tags: "취향 등록", preferences: "매칭 조건", trip: "여행 일정" }[nextStep(load.me)!]} 준비 중`

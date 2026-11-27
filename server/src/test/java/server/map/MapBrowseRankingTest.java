@@ -81,4 +81,13 @@ class MapBrowseRankingTest {
         assertThatThrownBy(() -> MapBrowseRanking.validatePage(0, 51, 50)).isInstanceOf(ApiException.class);
         assertThat(MapBrowseSort.from(" pins_asc ")).isEqualTo(MapBrowseSort.PINS_ASC);
     }
+
+    @Test
+    void 추천순에서_취향_점수가_같으면_동네가_맞는_지도가_앞이다() {
+        Candidate noArea = new Candidate(1L, A, 6, T, 0, 2, null, 0);
+        Candidate areaHit = new Candidate(2L, B, 6, T, 0, 2, 50L, 1);
+        Candidate moreTaste = new Candidate(3L, B, 6, T, 0, 3, null, 0);
+        assertThat(MapBrowseRanking.rank(List.of(noArea, areaHit, moreTaste), MapBrowseSort.RECOMMENDED, null, null))
+                .extracting(Candidate::mapId).containsExactly(3L, 2L, 1L);   // 동네는 점수 밖: 취향 3개가 여전히 먼저
+    }
 }

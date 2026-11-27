@@ -19,6 +19,7 @@ import server.match.domain.Match;
 import server.match.domain.MatchStatus;
 import server.match.repository.MatchRepository;
 import server.safety.repository.BlockRepository;
+import server.tag.domain.Tag;
 import server.tag.domain.UserTag;
 import server.tag.repository.UserTagRepository;
 import server.trip.repository.TripRepository;
@@ -35,6 +36,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,10 +70,20 @@ public class MapBrowseService {
     private final PolicyProperties policy;
     private final Clock clock;
 
-    /** MAP-07 지도 고르기 */
+    /** MAP-07 지도 고르기 (동네 조건 없이) */
     @Transactional(readOnly = true)
     public MapBrowseResponse browse(UUID travelerId, String sortParam, Integer minPins, Integer maxPins,
                                     Integer page, Integer size) {
+        return browse(travelerId, sortParam, minPins, maxPins, null, page, size);
+    }
+
+    /**
+     * MAP-07 지도 고르기
+     * @param areaTagId 위쪽 미니 지도에서 고른 동네(AREA 태그 id). null 이면 전체
+     */
+    @Transactional(readOnly = true)
+    public MapBrowseResponse browse(UUID travelerId, String sortParam, Integer minPins, Integer maxPins,
+                                    Long areaTagId, Integer page, Integer size) {
         MapBrowseSort sort = MapBrowseSort.from(sortParam);
         MapBrowseRanking.validatePinRange(minPins, maxPins, policy.mapMinSpots());
         int pageNo = page == null ? 0 : page;
@@ -103,38 +115,131 @@ public class MapBrowseService {
                 .filter(m -> myMatchByMap.containsKey(m.getId())
                         || (listable.contains(m.getMateId()) && isPublic(spotStats.get(m.getId()))))
                 .toList();
+        // 동네 목록 (미니 지도 말풍선 순서 = 태그 순서)
+        TagIndex tags = TagIndex.of(queries.findAllTags());
+        if (areaTagId != null && !tags.isArea(areaTagId)) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        }
+        String lang = ctx.traveler().getLanguage();
         if (candidateMaps.isEmpty()) {
-            return new MapBrowseResponse(List.of(), 0, EmptyReason.NO_MATE, pageNo, false);
+            return new MapBrowseResponse(List.of(), 0, EmptyReason.NO_MATE, pageNo, false,
+                    areaCounts(tags, List.of(), lang));
         }
 
-        // 4) 겹치는 취향 수·선택 횟수 → 필터·정렬·페이지
-        Set<Long> travelerTags = userTagRepository.findByUserId(travelerId).stream()
+        // 4) 겹치는 취향 수(동네 제외, 세부는 항목으로 묶음)·동네·선택 횟수 → 필터·정렬·페이지
+        Set<Long> travelerTagIds = userTagRepository.findByUserId(travelerId).stream()
                 .map(UserTag::getTagId).collect(Collectors.toSet());
+        Set<Long> travelerTaste = tags.tasteKeys(travelerTagIds);
+        Set<Long> travelerAreas = tags.areas(travelerTagIds);
         Set<UUID> candidateMates = candidateMaps.stream().map(SecretMap::getMateId).collect(Collectors.toSet());
-        Map<UUID, Integer> commonByMate = new HashMap<>();
-        queries.findTagsOf(candidateMates).stream()
-                .filter(ut -> travelerTags.contains(ut.getTagId()))
-                .forEach(ut -> commonByMate.merge(ut.getUserId(), 1, Integer::sum));
+        Map<UUID, Set<Long>> tagsByMate = queries.findTagsOf(candidateMates).stream()
+                .collect(Collectors.groupingBy(UserTag::getUserId,
+                        Collectors.mapping(UserTag::getTagId, Collectors.toSet())));
+        Map<Long, Long> areaByMap = areaOfMaps(candidateMaps, tags);
         Map<Long, Long> selectedByMap = toLongMap(
                 queries.countSelectedByMap(candidateMaps.stream().map(SecretMap::getId).toList()));
 
         List<Candidate> candidates = candidateMaps.stream()
-                .map(m -> new Candidate(m.getId(), m.getMateId(), spotStats.getOrDefault(m.getId(), new long[2])[0],
-                        m.getUpdatedAt(), selectedByMap.getOrDefault(m.getId(), 0L),
-                        commonByMate.getOrDefault(m.getMateId(), 0)))
+                .map(m -> {
+                    Set<Long> mateTags = tagsByMate.getOrDefault(m.getMateId(), Set.of());
+                    Set<Long> common = new HashSet<>(tags.tasteKeys(mateTags));
+                    common.retainAll(travelerTaste);
+                    Long area = areaByMap.get(m.getId());
+                    boolean areaMatch = (area != null && travelerAreas.contains(area))
+                            || tags.areas(mateTags).stream().anyMatch(travelerAreas::contains);
+                    return new Candidate(m.getId(), m.getMateId(), spotStats.getOrDefault(m.getId(), new long[2])[0],
+                            m.getUpdatedAt(), selectedByMap.getOrDefault(m.getId(), 0L), common.size(),
+                            area, areaMatch ? 1 : 0);
+                })
                 .toList();
-        MapBrowseRanking.Page result = MapBrowseRanking.page(
-                MapBrowseRanking.rank(candidates, sort, minPins, maxPins), pageNo, pageSize);
+        List<Candidate> inRange = MapBrowseRanking.rank(candidates, sort, minPins, maxPins);
+        List<AreaCount> areas = areaCounts(tags, inRange, lang);          // 말풍선 숫자는 동네 조건을 빼고 센다
+        List<Candidate> filtered = areaTagId == null ? inRange
+                : inRange.stream().filter(c -> areaTagId.equals(c.areaTagId())).toList();
+        MapBrowseRanking.Page result = MapBrowseRanking.page(filtered, pageNo, pageSize);
 
         Map<Long, SecretMap> mapById = candidateMaps.stream()
                 .collect(Collectors.toMap(SecretMap::getId, Function.identity()));
         List<MapCard> cards = result.items().stream()
                 .map(c -> new MapCard(c.mapId(), title(mapById.get(c.mapId())),
                         UserSummary.of(mateById.get(c.mateId()), today), c.pinCount(),
-                        Times.kst(c.updatedAt()), c.selectedCount(), myMatchByMap.get(c.mapId())))
+                        Times.kst(c.updatedAt()), c.selectedCount(), myMatchByMap.get(c.mapId()),
+                        tags.areaView(c.areaTagId(), lang)))
                 .toList();
         EmptyReason empty = result.totalCount() == 0 ? EmptyReason.NO_MAP_IN_RANGE : null;
-        return new MapBrowseResponse(cards, result.totalCount(), empty, result.page(), result.hasNext());
+        return new MapBrowseResponse(cards, result.totalCount(), empty, result.page(), result.hasNext(), areas);
+    }
+
+    /** 지도마다 스팟 가운데 위치에서 가장 가까운 동네(AREA 태그 id) */
+    private Map<Long, Long> areaOfMaps(List<SecretMap> maps, TagIndex tags) {
+        Map<Long, Long> out = new HashMap<>();
+        for (Object[] row : queries.centerOfMaps(maps.stream().map(SecretMap::getId).toList())) {
+            if (row[1] == null || row[2] == null) continue;
+            String name = MapArea.nearest(((Number) row[1]).doubleValue(), ((Number) row[2]).doubleValue());
+            Long areaId = tags.areaIdByName(name);
+            if (areaId != null) out.put((Long) row[0], areaId);
+        }
+        return out;
+    }
+
+    /** 동네별 지도 수 (동네 조건을 빼고 핀 개수 조건만 적용한 목록 기준) */
+    private static List<AreaCount> areaCounts(TagIndex tags, List<Candidate> candidates, String lang) {
+        Map<Long, Long> count = candidates.stream().filter(c -> c.areaTagId() != null)
+                .collect(Collectors.groupingBy(Candidate::areaTagId, Collectors.counting()));
+        return tags.areaTags().stream()
+                .map(t -> new AreaCount(t.getId(), t.nameIn(lang), count.getOrDefault(t.getId(), 0L)))
+                .toList();
+    }
+
+    /**
+     * 취향 태그 한 번에 읽어 둔 것. 추천 점수 규칙(디자인 11/26):
+     * 동네(AREA)는 점수에 넣지 않고, 3단계 세부·멤버는 2단계 항목으로 묶어서 같은 취향으로 본다.
+     */
+    private record TagIndex(Map<Long, Tag> byId, List<Tag> areaTags, Map<String, Long> areaIdByKo) {
+
+        static TagIndex of(List<Tag> all) {
+            Map<Long, Tag> byId = all.stream().collect(Collectors.toMap(Tag::getId, Function.identity()));
+            List<Tag> areaTags = all.stream()
+                    .filter(t -> "AREA".equals(t.getCategory()) && t.getDepth() == 2)
+                    .sorted(java.util.Comparator.comparing(Tag::getId))
+                    .toList();
+            Map<String, Long> byKo = new LinkedHashMap<>();
+            areaTags.forEach(t -> byKo.put(t.getNameKo(), t.getId()));
+            return new TagIndex(byId, areaTags, byKo);
+        }
+
+        boolean isArea(Long id) {
+            Tag t = byId.get(id);
+            return t != null && "AREA".equals(t.getCategory()) && t.getDepth() == 2;
+        }
+
+        Long areaIdByName(String nameKo) {
+            return nameKo == null ? null : areaIdByKo.get(nameKo);
+        }
+
+        /** 동네를 뺀 취향을 2단계 항목 id 로 묶는다 */
+        Set<Long> tasteKeys(Set<Long> tagIds) {
+            Set<Long> out = new HashSet<>();
+            for (Long id : tagIds) {
+                Tag t = byId.get(id);
+                if (t == null) {                       // 태그 표에 없는 id 는 그대로 취향으로 센다
+                    out.add(id);
+                    continue;
+                }
+                if ("AREA".equals(t.getCategory())) continue;
+                out.add(t.getDepth() >= 3 && t.getParentId() != null ? t.getParentId() : t.getId());
+            }
+            return out;
+        }
+
+        Set<Long> areas(Set<Long> tagIds) {
+            return tagIds.stream().filter(this::isArea).collect(Collectors.toSet());
+        }
+
+        AreaView areaView(Long areaId, String lang) {
+            Tag t = areaId == null ? null : byId.get(areaId);
+            return t == null ? null : new AreaView(t.getId(), t.nameIn(lang));
+        }
     }
 
     /** MAP-08 공개 스팟 미리보기 (매칭 전) */
@@ -228,12 +333,20 @@ public class MapBrowseService {
     /** 빈 목록일 때 화면 구분: NO_MATE → T-18, NO_MAP_IN_RANGE → T-11 빈 화면 */
     public enum EmptyReason { NO_MATE, NO_MAP_IN_RANGE }
 
+    /** 지도의 동네 (카드 맨 앞 동네 이름). 이름은 보는 사람 언어 */
+    public record AreaView(Long tagId, String name) {
+    }
+
+    /** 미니 지도 말풍선: 동네별 지도 수 (동네 조건은 빼고 센다, 0이어도 6곳 모두) */
+    public record AreaCount(Long tagId, String name, long mapCount) {
+    }
+
     public record MapCard(Long mapId, LocalizedText title, UserSummary mate, long pinCount,
-                          OffsetDateTime lastUpdatedAt, long selectedCount, Long myMatchId) {
+                          OffsetDateTime lastUpdatedAt, long selectedCount, Long myMatchId, AreaView area) {
     }
 
     public record MapBrowseResponse(List<MapCard> items, long totalCount, EmptyReason emptyReason,
-                                    int page, boolean hasNext) {
+                                    int page, boolean hasNext, List<AreaCount> areas) {
     }
 
     public record PreviewSpot(Long spotId, String name, String address, BigDecimal lat, BigDecimal lng,

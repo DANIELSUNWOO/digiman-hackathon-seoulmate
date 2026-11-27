@@ -1,4 +1,4 @@
-export { destinationFor } from "./model";
+export { destinationFor, timeLabel } from "./model";
 export {
   NotificationBell,
   type NotificationBellProps,

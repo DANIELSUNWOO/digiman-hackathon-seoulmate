@@ -28,7 +28,7 @@ public enum ErrorCode {
     NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
     PROFILE_REQUIRED(HttpStatus.CONFLICT, "프로필을 먼저 등록해 주세요."),
     PROFILE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "프로필이 이미 등록되어 있습니다. 수정은 PATCH /users/me 를 사용하세요."),
-    TAG_COUNT_INVALID(HttpStatus.BAD_REQUEST, "취향은 1개 이상, 대분류마다 2개까지 선택해 주세요."),
+    TAG_COUNT_INVALID(HttpStatus.BAD_REQUEST, "취향을 1개 이상 선택해 주세요."),
     INVALID_TAG(HttpStatus.BAD_REQUEST, "선택할 수 없는 취향입니다."),
     PREFERENCES_NOT_FOUND(HttpStatus.NOT_FOUND, "매칭 조건이 없습니다."),
     INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, "종료일이 시작일보다 빠릅니다."),

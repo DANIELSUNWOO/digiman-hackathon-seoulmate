@@ -50,6 +50,9 @@ public class UserService {
         if (!Boolean.TRUE.equals(req.agreeTerms())) throw new ApiException(ErrorCode.TERMS_NOT_AGREED);
         if (userRepository.existsById(token.id())) throw new ApiException(ErrorCode.USER_ALREADY_REGISTERED);
         User user = User.register(token.id(), req.country(), policy.maxMatchSlots(), LocalDateTime.now(clock));
+        // 디자인 11/26 (M-02): 메이트는 휴대폰 본인인증으로 가입하고 여권 단계가 없다 → 등록 즉시 인증 완료.
+        // 실제 문자 인증은 Supabase Phone 로그인 몫이라 서버는 따로 확인하지 않는다 (결선 MVP)
+        if (user.isMate()) user.verify();
         try {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {        // 앱이 두 번 연속 호출한 경우
@@ -100,7 +103,7 @@ public class UserService {
     }
 
     // ---------- USER-02 여권 인증 ----------
-    /** MVP: 사진은 받기만 하고 저장하지 않는다 (검증도 안 하는데 보관하면 개인정보 위험만 생김) */
+    /** MVP: 사진은 받기만 하고 저장하지 않는다 (검증도 안 하는데 보관하면 개인정보 위험만 생김). 여행자용 (메이트는 등록 때 이미 인증) */
     @Transactional
     public String verify(AuthUser me, MultipartFile passportImage) {
         if (passportImage == null || passportImage.isEmpty()) throw new ApiException(ErrorCode.VALIDATION_ERROR);

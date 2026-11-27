@@ -58,7 +58,9 @@ export default function Account() {
         (!nextStep(load.me) ||
           nextStep(load.me) === "verification" ||
           nextStep(load.me) === "profile" ||
-          nextStep(load.me) === "tags")));
+          nextStep(load.me) === "tags" ||
+          nextStep(load.me) === "trip" ||
+          nextStep(load.me) === "preferences")));
 
   async function action(fn: () => Promise<void>) {
     if (locked) return;
@@ -218,10 +220,41 @@ export default function Account() {
               />
             )}
 
+          {load.me.role === "TRAVELER" &&
+            load.me.onboarding.tags &&
+            load.me.onboarding.preferences && (
+              <Button
+                secondary
+                language={language}
+                disabled={locked}
+                label="マッチング条件を編集"
+                onPress={() =>
+                  router.push("/(onboarding)/preferences?from=account")
+                }
+              />
+            )}
+
+          {load.me.role === "TRAVELER" &&
+            load.me.onboarding.verified &&
+            load.me.onboarding.profile &&
+            load.me.onboarding.tags &&
+            load.me.onboarding.preferences &&
+            load.me.onboarding.trip && (
+              <Button
+                secondary
+                language={language}
+                disabled={locked}
+                label="旅行日程を編集"
+                onPress={() => router.push("/(onboarding)/trip?from=account")}
+              />
+            )}
+
           {nextStep(load.me) &&
             nextStep(load.me) !== "verification" &&
             nextStep(load.me) !== "profile" &&
-            nextStep(load.me) !== "tags" && (
+            nextStep(load.me) !== "tags" &&
+            nextStep(load.me) !== "trip" &&
+            nextStep(load.me) !== "preferences" && (
               <Notice language={language}>
                 {ko
                   ? `다음 단계: ${{ verification: "본인 인증", profile: "프로필 등록", tags: "취향 등록", preferences: "매칭 조건", trip: "여행 일정" }[nextStep(load.me)!]} 준비 중`
@@ -286,6 +319,25 @@ export default function Account() {
                   label={ko ? "취향 등록하기" : "好みを登録する"}
                   onPress={() =>
                     router.push("/(onboarding)/tags?from=onboarding")
+                  }
+                />
+              ) : load.kind === "ready" &&
+                nextStep(load.me) === "preferences" ? (
+                <Button
+                  language={language}
+                  disabled={locked}
+                  label="マッチング条件を登録する"
+                  onPress={() =>
+                    router.push("/(onboarding)/preferences?from=onboarding")
+                  }
+                />
+              ) : load.kind === "ready" && nextStep(load.me) === "trip" ? (
+                <Button
+                  language={language}
+                  disabled={locked}
+                  label="旅行日程を登録する"
+                  onPress={() =>
+                    router.push("/(onboarding)/trip?from=onboarding")
                   }
                 />
               ) : (

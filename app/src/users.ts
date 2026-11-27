@@ -112,6 +112,8 @@ export type OnboardingTargetRoute =
   | "/(onboarding)/verification"
   | "/(onboarding)/profile"
   | "/(onboarding)/tags"
+  | "/(onboarding)/preferences"
+  | "/(onboarding)/trip"
   | "/account"
   | "/(tabs)";
 
@@ -121,6 +123,8 @@ export function onboardingRouteFor(
   if (step === "verification") return "/(onboarding)/verification";
   if (step === "profile") return "/(onboarding)/profile";
   if (step === "tags") return "/(onboarding)/tags";
+  if (step === "preferences") return "/(onboarding)/preferences";
+  if (step === "trip") return "/(onboarding)/trip";
   if (step === null) return "/(tabs)";
   return "/account";
 }

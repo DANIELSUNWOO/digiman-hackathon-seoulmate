@@ -6,12 +6,13 @@ import { nextStep, onboardingRouteFor, type Me } from "../../users";
 export type OnboardingOrigin = "onboarding" | "account";
 
 export type OnboardingNavStep =
-  "verification" | "profile" | "tags" | "first-map";
+  "verification" | "profile" | "tags" | "first-map" | "preferences" | "trip";
 
 export type OnboardingPreviousRoute =
   | "/(onboarding)/verification?from=onboarding"
   | "/(onboarding)/profile?from=onboarding"
   | "/(onboarding)/tags?from=onboarding"
+  | "/(onboarding)/preferences?from=onboarding"
   | "/account";
 
 export function parseOnboardingOrigin(
@@ -30,6 +31,8 @@ export function previousOnboardingRoute(
 ): OnboardingPreviousRoute {
   if (origin === "account") return "/account";
   if (role === "TRAVELER") {
+    if (current === "trip") return "/(onboarding)/preferences?from=onboarding";
+    if (current === "preferences") return "/(onboarding)/tags?from=onboarding";
     if (current === "tags") return "/(onboarding)/profile?from=onboarding";
     if (current === "profile")
       return "/(onboarding)/verification?from=onboarding";
@@ -65,6 +68,8 @@ export function nextRouteAfterTagsSave(
   if (options.hadTagsBefore && options.origin !== "onboarding") {
     return "/account";
   }
+  if (nextStep(fresh) === "preferences")
+    return "/(onboarding)/preferences?from=onboarding";
   return onboardingRouteFor(nextStep(fresh));
 }
 

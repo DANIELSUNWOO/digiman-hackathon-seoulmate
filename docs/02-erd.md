@@ -1,4 +1,4 @@
-# 서울메이트 ERD v2.6 (11/27, 요구사항정의서 v3.5 · API 명세서 v1.8 · DB 마이그레이션 V1~V3 기준)
+# 서울메이트 ERD v2.7 (11/27, 요구사항정의서 v3.5 · API 명세서 v1.9 · DB 마이그레이션 V1~V5 기준)
 
 > Supabase Postgres 기준. 테이블 17개. 로그인 정보(이메일·비밀번호)는 Supabase Auth(auth.users)가 관리하고, 이 문서의 USERS는 서비스용 회원 정보다.
 
@@ -6,6 +6,14 @@
 - `02-erd.png` 그림은 v2.5 기준이다. 아래 0-C의 변경은 그림에 아직 없다.
 
 ---
+
+## 0-D. v2.6 → v2.7 변경 (디자이너 최종본 11/26, V4 · V5 마이그레이션)
+
+| 변경 | 내용 |
+| --- | --- |
+| TAGS 데이터 교체 (V4) | 분류 11개(CAFE · FOOD · BEAUTY · SHOP · WALK · CULTURE · OSHI_KPOP · OSHI_DRAMA · OSHI_ANIME · OSHI_BASEBALL · AREA) + 항목 63개 + 세부 87개. 테이블 구조는 그대로. 예전 선택(USER_TAGS)은 지워지고 시연 메이트 취향은 다시 붙인다 |
+| REVIEWS.content_translated 추가 (V5) | 상호 후기 번역 |
+| idx_reviews_reviewee 추가 (V5) | 받은 후기 모음(REVIEW-03) 최근 순 조회 |
 
 ## 0-C. v2.5 → v2.6 변경 (API v1.7 · 화면 명세 v9 반영, V2 · V3 마이그레이션)
 
@@ -253,6 +261,7 @@ erDiagram
     uuid reviewee_id FK
     int rating "1~5"
     text content
+    text content_translated
     timestamp created_at
   }
   NOTIFICATIONS {
@@ -439,6 +448,7 @@ erDiagram
 | ALBUMS.title, cover_url | | 제목과 표지 |
 | REVIEWS.reviewer_id, reviewee_id | uuid FK | 서로에 대한 후기 |
 | REVIEWS.rating | int | 1~5 |
+| REVIEWS.content_translated | text | 후기 번역 (V5, 받는 사람 언어). 받은 후기 모음(REVIEW-03)은 reviewee_id로 최근 순 조회 (인덱스 idx_reviews_reviewee) |
 
 ### NOTIFICATIONS (앱 안 알림)
 | 컬럼 | 타입 | 설명 |

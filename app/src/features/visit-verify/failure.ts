@@ -1,5 +1,4 @@
-import { ApiError } from "../../api";
-import { errorText } from "./errors";
+import { canRetry, errorText, serverCode } from "./errors";
 import { strings } from "./strings";
 import type { LocationProblem } from "./types";
 import type { Verification } from "./useVerification";
@@ -39,8 +38,14 @@ type Failed = Extract<Verification, { status: "noLocation" | "failed" }>;
 export function failureCopy(state: Failed): FailureCopy {
   if (state.status === "noLocation") return LOCATION[state.problem];
   const { error, lowAccuracy } = state;
-  const code = error instanceof ApiError ? error.serverError?.code : undefined;
+  const code = serverCode(error);
   if (code === "LOCATION_REQUIRED") return LOCATION.denied;
+  if (code === "ALREADY_VISITED")
+    return {
+      title: strings.alreadyVisited,
+      body: strings.errorVisited,
+      retry: false,
+    };
   if (code === "OUT_OF_RANGE")
     return {
       title: strings.farTitle,
@@ -53,6 +58,6 @@ export function failureCopy(state: Failed): FailureCopy {
   return {
     title: strings.failedTitle,
     body: errorText(error, strings.errorSubmit),
-    retry: true,
+    retry: canRetry(error),
   };
 }

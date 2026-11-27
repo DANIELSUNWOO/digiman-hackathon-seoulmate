@@ -1,5 +1,5 @@
 // T-23 / F-UI-11 방문 인증 작성.
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,7 +13,8 @@ import { errorText } from "./errors";
 import { readPosition as readFromDevice } from "./location";
 import { pickPhoto as pickFromDevice } from "./photo";
 import { strings } from "./strings";
-import type { CourseSpot, PickPhoto, ReadPosition, SubmitVisit } from "./types";
+import { createSubmit } from "./submission";
+import type { PickPhoto, ReadPosition, SubmitVisit } from "./types";
 import { useSpot, type SpotLoad } from "./useSpot";
 import { VerifyForm } from "./VerifyForm";
 
@@ -23,8 +24,8 @@ export interface VisitVerifyScreenProps {
   readPosition?: ReadPosition;
   matchId: number;
   spotId: number;
+  /** 뒤로 가기와 인증 완료 뒤 "코스로 돌아가기"에 쓴다. */
   onBack: () => void;
-  submit: SubmitVisit;
 }
 
 export function VisitVerifyScreen({
@@ -34,9 +35,11 @@ export function VisitVerifyScreen({
   matchId,
   spotId,
   onBack,
-  submit,
 }: VisitVerifyScreenProps): ReactElement {
   const load = useSpot(api, matchId, spotId);
+  // 올린 사진을 기억해야 해서 화면이 살아 있는 동안 하나만 만든다.
+  // 매칭이나 스팟이 바뀌면 부르는 쪽이 key로 다시 만든다.
+  const [submit] = useState(() => createSubmit(api, matchId, spotId));
 
   return (
     <KeyboardAvoidingView
@@ -56,6 +59,7 @@ export function VisitVerifyScreen({
           pickPhoto={pickPhoto}
           readPosition={readPosition}
           submit={submit}
+          onDone={onBack}
         />
       </Screen>
     </KeyboardAvoidingView>
@@ -67,6 +71,7 @@ interface SpotBodyProps {
   pickPhoto: PickPhoto;
   readPosition: ReadPosition;
   submit: SubmitVisit;
+  onDone: () => void;
 }
 
 function SpotBody({ load, ...form }: SpotBodyProps): ReactElement {
@@ -91,26 +96,15 @@ function SpotBody({ load, ...form }: SpotBodyProps): ReactElement {
     return <Notice language="ja">{strings.spotMissing}</Notice>;
   return (
     <>
-      <SpotHeader spot={state.spot} />
+      {/* 스팟 이름은 서버가 한국어로 내려준다. */}
+      <Label language="ko" weight="bold">
+        {state.spot.name}
+      </Label>
       {state.spot.visited ? (
         <Notice language="ja">{strings.alreadyVisited}</Notice>
       ) : (
         <VerifyForm {...form} />
       )}
-    </>
-  );
-}
-
-function SpotHeader({ spot }: { spot: CourseSpot }): ReactElement {
-  return (
-    <>
-      {/* 스팟 이름은 서버가 한국어로 내려준다. */}
-      <Label language="ko" weight="bold">
-        {spot.name}
-      </Label>
-      <Label language="ja" variant="desc" tone="desc">
-        {strings.subtitle}
-      </Label>
     </>
   );
 }

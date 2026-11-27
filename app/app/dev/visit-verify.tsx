@@ -4,14 +4,15 @@ import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { VisitVerifyScreen } from "../../src/features/visit-verify";
 import {
-  createMockLocation,
+  createMockPosition,
   createMockVerifyApi,
   deniedPicker,
   type MockLocation,
   type MockScenario,
+  type MockSubmit,
 } from "../../src/features/visit-verify/mockApi";
 import { theme } from "../../src/theme";
-import { Button, Chip, Input, Label } from "../../src/ui";
+import { Button, Chip, Input } from "../../src/ui";
 
 const SCENARIOS: MockScenario[] = [
   "data",
@@ -20,15 +21,19 @@ const SCENARIOS: MockScenario[] = [
   "error",
   "denied",
 ];
-const LOCATIONS: MockLocation[] = ["ok", "far", "denied", "off", "unavailable"];
+const LOCATIONS: MockLocation[] = ["ok", "denied", "off", "unavailable"];
+const SUBMITS: MockSubmit[] = ["ok", "far", "uploadFail", "already"];
 
 // 방문 인증 확인용 경로. 코스 지도 없이 들어온다. 개발 빌드에서만 열린다.
 export default function DevVisitVerify(): ReactElement {
   const [scenario, setScenario] = useState<MockScenario>("data");
-  const [submitted, setSubmitted] = useState("-");
   const [location, setLocation] = useState<MockLocation>("ok");
-  const mock = useMemo(() => createMockLocation(location), [location]);
-  const api = useMemo(() => createMockVerifyApi(scenario), [scenario]);
+  const [submit, setSubmit] = useState<MockSubmit>("ok");
+  const api = useMemo(
+    () => createMockVerifyApi(scenario, submit),
+    [scenario, submit],
+  );
+  const readPosition = useMemo(() => createMockPosition(location), [location]);
   if (!__DEV__) return <Redirect href="/" />;
 
   return (
@@ -41,40 +46,60 @@ export default function DevVisitVerify(): ReactElement {
           paddingHorizontal: theme.space.screen,
         }}
       >
-        {SCENARIOS.map((value) => (
-          <Chip
-            key={value}
-            label={value}
-            selected={scenario === value}
-            onPress={() => setScenario(value)}
-          />
-        ))}
-        {LOCATIONS.map((value) => (
-          <Chip
-            key={value}
-            label={`위치 ${value}`}
-            selected={location === value}
-            onPress={() => setLocation(value)}
-          />
-        ))}
-        <Label language="ko">{`마지막 제출: ${submitted}`}</Label>
+        <Choices values={SCENARIOS} value={scenario} onChange={setScenario} />
+        <Choices
+          prefix="위치 "
+          values={LOCATIONS}
+          value={location}
+          onChange={setLocation}
+        />
+        <Choices
+          prefix="제출 "
+          values={SUBMITS}
+          value={submit}
+          onChange={setSubmit}
+        />
         <RealRouteEntry />
       </View>
-      <View key={scenario} style={{ flex: 1 }}>
+      {/* 시나리오가 바뀌면 화면을 새로 만든다. */}
+      <View key={`${scenario}-${submit}`} style={{ flex: 1 }}>
         <VisitVerifyScreen
           api={api}
           pickPhoto={scenario === "denied" ? deniedPicker : undefined}
+          readPosition={readPosition}
           matchId={101}
           spotId={31}
           onBack={() => {}}
-          readPosition={mock.readPosition}
-          submit={async (draft, position) => {
-            await mock.submit(draft, position);
-            setSubmitted(draft.review);
-          }}
         />
       </View>
     </SafeAreaView>
+  );
+}
+
+interface ChoicesProps<T extends string> {
+  prefix?: string;
+  values: T[];
+  value: T;
+  onChange: (value: T) => void;
+}
+
+function Choices<T extends string>({
+  prefix = "",
+  values,
+  value,
+  onChange,
+}: ChoicesProps<T>): ReactElement {
+  return (
+    <>
+      {values.map((option) => (
+        <Chip
+          key={option}
+          label={`${prefix}${option}`}
+          selected={value === option}
+          onPress={() => onChange(option)}
+        />
+      ))}
+    </>
   );
 }
 

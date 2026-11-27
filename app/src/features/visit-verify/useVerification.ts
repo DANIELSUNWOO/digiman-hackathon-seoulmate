@@ -2,7 +2,9 @@ import { useRef, useState } from "react";
 import type {
   LocationProblem,
   ReadPosition,
+  SubmitStage,
   SubmitVisit,
+  VisitCreated,
   VisitDraft,
 } from "./types";
 
@@ -12,7 +14,8 @@ const LOW_ACCURACY_M = 100;
 export type Verification =
   | { status: "idle" }
   | { status: "locating" }
-  | { status: "sending" }
+  | { status: SubmitStage }
+  | { status: "done"; result: VisitCreated }
   | { status: "noLocation"; problem: LocationProblem }
   | { status: "failed"; error: unknown; lowAccuracy: boolean };
 
@@ -37,10 +40,11 @@ export function useVerification(
     if (located.status !== "ok")
       return { status: "noLocation", problem: located.status };
     const { position } = located;
-    setState({ status: "sending" });
     try {
-      await submit(draft, position);
-      return { status: "idle" };
+      const result = await submit(draft, position, (status) =>
+        setState({ status }),
+      );
+      return { status: "done", result };
     } catch (error: unknown) {
       const lowAccuracy = (position.accuracy ?? 0) > LOW_ACCURACY_M;
       return { status: "failed", error, lowAccuracy };

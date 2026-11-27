@@ -12,6 +12,7 @@ import { theme } from "../../theme";
 import { BottomSheet, Button, Label, Notice } from "../../ui";
 import { failureCopy, type FailureCopy } from "./failure";
 import { strings } from "./strings";
+import type { SubmitStage } from "./types";
 import type { Verification } from "./useVerification";
 
 export interface VerifySheetProps {
@@ -26,11 +27,14 @@ export function VerifySheet({
   onClose,
 }: VerifySheetProps): ReactElement {
   return (
-    <BottomSheet visible={state.status !== "idle"} onClose={onClose}>
+    <BottomSheet
+      visible={state.status !== "idle" && state.status !== "done"}
+      onClose={onClose}
+    >
       <View style={styles.sheet}>
-        {(state.status === "locating" || state.status === "sending") && (
-          <Progress sending={state.status === "sending"} />
-        )}
+        {(state.status === "locating" ||
+          state.status === "uploading" ||
+          state.status === "verifying") && <Progress stage={state.status} />}
         {(state.status === "noLocation" || state.status === "failed") && (
           <Failure
             copy={failureCopy(state)}
@@ -43,14 +47,18 @@ export function VerifySheet({
   );
 }
 
-function Progress({ sending }: { sending: boolean }): ReactElement {
+interface ProgressProps {
+  stage: "locating" | SubmitStage;
+}
+
+function Progress({ stage }: ProgressProps): ReactElement {
   return (
     <>
       <ActivityIndicator color={theme.color.brandDeep} />
       <Label language="ja" weight="bold" center>
-        {sending ? strings.sending : strings.checking}
+        {stage === "locating" ? strings.checking : strings[stage]}
       </Label>
-      {!sending && (
+      {stage === "locating" && (
         <Label language="ja" variant="desc" tone="desc" center>
           {strings.checkingBody}
         </Label>
@@ -80,7 +88,7 @@ function Failure({ copy, onRetry, onClose }: FailureProps): ReactElement {
       <Label language="ja" variant="desc" center>
         {copy.body}
       </Label>
-      <Notice language="ja">{strings.draftKept}</Notice>
+      {copy.retry && <Notice language="ja">{strings.draftKept}</Notice>}
       {openSettings && (
         <Button
           label={strings.openSettings}

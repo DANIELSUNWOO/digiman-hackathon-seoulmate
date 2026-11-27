@@ -1,15 +1,8 @@
 import * as Location from "expo-location";
+import { withTimeout } from "./timeout";
 import type { LocationResult, ReadPosition } from "./types";
 
 const TIMEOUT_MS = 15_000;
-
-/** getCurrentPositionAsync에는 제한 시간이 없어 직접 건다. */
-function withTimeout<T>(task: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("location timeout")), ms);
-    task.then(resolve, reject).finally(() => clearTimeout(timer));
-  });
-}
 
 async function locate(): Promise<LocationResult> {
   if (!(await Location.hasServicesEnabledAsync())) return { status: "off" };
@@ -19,6 +12,7 @@ async function locate(): Promise<LocationResult> {
   const { coords } = await withTimeout(
     Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
     TIMEOUT_MS,
+    new Error("location timeout"),
   );
   const { latitude, longitude, accuracy } = coords;
   return {

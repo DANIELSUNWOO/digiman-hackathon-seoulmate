@@ -34,10 +34,31 @@ export type LocationResult =
 
 export type ReadPosition = () => Promise<LocationResult>;
 
+/** VISIT-01 요청 본문 */
+export interface VisitRequest {
+  spotId: number;
+  photoUrl: string;
+  review: string;
+  lat: number;
+  lng: number;
+}
+
+/** VISIT-01 응답 */
+export interface VisitCreated {
+  visitId: number;
+  spotId: number;
+  verifiedAt: string;
+  progress: { visited: number; required: number; total: number };
+  chatReady: boolean;
+}
+
+export type SubmitStage = "uploading" | "verifying";
+
 export type SubmitVisit = (
   draft: VisitDraft,
   position: Position,
-) => Promise<void>;
+  onStage: (stage: SubmitStage) => void,
+) => Promise<VisitCreated>;
 
 export interface VisitDraft {
   photo: PickedPhoto;

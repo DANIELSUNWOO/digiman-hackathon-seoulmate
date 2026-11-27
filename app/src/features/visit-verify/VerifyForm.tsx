@@ -1,21 +1,21 @@
 import { MapPinArea } from "phosphor-react-native";
 import { useState, type ReactElement } from "react";
 import { theme } from "../../theme";
-import { Button, Input, Label, Notice, ScreenFooter } from "../../ui";
+import { Button, Label, Notice, ScreenFooter } from "../../ui";
 import { PhotoField } from "./PhotoField";
+import { ReviewField } from "./ReviewField";
 import { strings } from "./strings";
 import type { PickPhoto, ReadPosition, SubmitVisit } from "./types";
 import { usePhoto } from "./usePhoto";
 import { useVerification } from "./useVerification";
+import { VerifyDone } from "./VerifyDone";
 import { VerifySheet } from "./VerifySheet";
-
-// 서버 VisitService.VisitRequest의 제한
-const REVIEW_MAX = 500;
 
 export interface VerifyFormProps {
   pickPhoto: PickPhoto;
   readPosition: ReadPosition;
   submit: SubmitVisit;
+  onDone: () => void;
 }
 
 /** 사진과 후기가 모두 있어야 제출할 수 있다. */
@@ -23,6 +23,7 @@ export function VerifyForm({
   pickPhoto,
   readPosition,
   submit,
+  onDone,
 }: VerifyFormProps): ReactElement {
   const picking = usePhoto(pickPhoto);
   const flow = useVerification(readPosition, submit);
@@ -33,26 +34,15 @@ export function VerifyForm({
     if (photo) void flow.start({ photo, review: content });
   };
 
+  if (flow.state.status === "done") return <VerifyDone onBack={onDone} />;
+
   return (
     <>
+      <Label language="ja" variant="desc" tone="desc">
+        {strings.subtitle}
+      </Label>
       <PhotoField picking={picking} />
-      <Label language="ja" variant="label">
-        {strings.reviewLabel}
-      </Label>
-      <Input
-        language="ja"
-        value={review}
-        onChangeText={setReview}
-        multiline
-        textAlignVertical="top"
-        maxLength={REVIEW_MAX}
-        placeholder={strings.reviewPlaceholder}
-        accessibilityLabel={strings.reviewLabel}
-        style={{ minHeight: 96 }}
-      />
-      <Label language="ja" variant="caption" tone="desc">
-        {`${review.length} / ${REVIEW_MAX}`}
-      </Label>
+      <ReviewField value={review} onChange={setReview} />
       <Notice
         language="ja"
         icon={

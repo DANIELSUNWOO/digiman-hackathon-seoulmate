@@ -14,7 +14,7 @@ public class SwaggerConfig {
     public OpenAPI openAPI() {
         String scheme = "bearerAuth";
         return new OpenAPI()
-                .info(new Info().title("서울메이트 API").version("v1").description("API 명세서 v1.1 기준"))
+                .info(new Info().title("서울메이트 API").version("v1").description("API 명세서 v1.8 기준 (docs/03-api-spec.md). 오른쪽 Authorize 에 Supabase access token 을 넣고 호출"))
                 .addSecurityItem(new SecurityRequirement().addList(scheme))
                 .components(new Components().addSecuritySchemes(scheme,
                         new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")));

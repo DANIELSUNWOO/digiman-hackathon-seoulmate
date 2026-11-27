@@ -22,13 +22,13 @@ public class TagController {
     private final TagService tagService;
     private final UserService userService;
 
-    @Operation(summary = "TAG-01 취향 목록 (대분류 → 세부)")
+    @Operation(summary = "TAG-01 취향 목록 (분류 → 항목, category 로 AREA 구분)")
     @GetMapping("/tags")
     public List<TagService.TagTree> tags(AuthUser me) {
         return tagService.tree(userService.languageOf(me.id()));
     }
 
-    @Operation(summary = "TAG-02 내 취향 저장 (통째로 교체, 1~10개, 세부 취향만)")
+    @Operation(summary = "TAG-02 내 취향 저장 (통째로 교체, 분류당 2개·전체 14개, 항목만)")
     @PutMapping("/users/me/tags")
     public Map<String, List<TagService.TagView>> saveMine(AuthUser me,
                                                            @RequestBody SaveTagsRequest req) {

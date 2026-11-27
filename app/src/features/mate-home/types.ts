@@ -29,7 +29,7 @@ export type MateProfile = {
 /** GET /matches 항목. 메이트가 부르면 partner는 여행자다. */
 export type MatchItem = {
   matchId: number;
-  chatStatus: "LOCKED" | "READY" | "REQUESTED" | "OPEN";
+  chatStatus: "LOCKED" | "READY" | "OPEN";
   partner: { nickname: string };
   courseMap: { mapId: number; title: string } | null;
   progress: {

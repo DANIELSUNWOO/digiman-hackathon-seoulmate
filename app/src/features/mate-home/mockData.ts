@@ -87,6 +87,11 @@ export function mockSpots(map: MyMap): MapSpot[] {
       translated: null,
       sourceLang: "ko",
     },
+    review: {
+      original: "오전 10시 전에 가면 한적해요",
+      translated: null,
+      sourceLang: "ko",
+    },
     isPreview: index < map.previewCount,
   }));
 }

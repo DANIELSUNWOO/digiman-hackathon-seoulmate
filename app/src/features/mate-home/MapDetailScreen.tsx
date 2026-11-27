@@ -96,8 +96,15 @@ function SpotList({ spots }: { spots: MapSpot[] }) {
             {spot.name}
           </Label>
           {!!spot.address && <Label language="ko">{spot.address}</Label>}
+          {!!spot.review?.original && (
+            <Label language="ko">
+              {strings.spotReview(spot.review.original)}
+            </Label>
+          )}
           {!!spot.reason?.original && (
-            <Label language="ko">{spot.reason.original}</Label>
+            <Label language="ko">
+              {strings.spotReason(spot.reason.original)}
+            </Label>
           )}
           {spot.isPreview && (
             <Label weight="medium" language="ko">

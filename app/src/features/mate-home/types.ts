@@ -26,6 +26,7 @@ export type MapSpot = {
   name: string;
   address: string | null;
   reason: LocalizedText | null;
+  review: LocalizedText | null;
   isPreview: boolean;
 };
 

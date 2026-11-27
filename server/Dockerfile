@@ -7,7 +7,8 @@ FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle gradle
-RUN chmod +x gradlew && ./gradlew --no-daemon dependencies > /dev/null
+# 라이브러리 jar 를 이 단계에서 받아 캐시해 둔다 (소스만 바뀐 배포는 다시 받지 않음)
+RUN chmod +x gradlew && ./gradlew --no-daemon -q downloadDependencies
 COPY src src
 RUN ./gradlew --no-daemon bootJar -x test && cp build/libs/*.jar /app/app.jar
 

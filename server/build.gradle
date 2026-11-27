@@ -17,6 +17,8 @@ repositories {
 	// Google 이 운영하는 Maven Central 미러를 먼저 쓴다.
 	// Render 무료 빌드 서버는 IP 를 여럿이 나눠 써서 Maven Central 이 429(Too Many Requests)로 막을 때가 있다
 	maven { url = 'https://maven-central.storage-download.googleapis.com/maven2/' }
+	// Google 미러에 아직 없는 파일은 두 번째 미러(Maven Central 전체 프록시)에서
+	maven { url = 'https://maven.aliyun.com/repository/public' }
 	mavenCentral()
 }
 

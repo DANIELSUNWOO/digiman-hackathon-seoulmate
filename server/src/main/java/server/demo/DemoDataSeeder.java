@@ -37,9 +37,10 @@ import java.util.stream.Collectors;
 
 /**
  * [서버 B] 시연용 데이터 넣기. DEMO_SEED=true 로 서버를 켜면 한 번만 넣는다 (DemoSeedRunner).
- * - 이미 넣었으면(첫 메이트가 있으면) 아무것도 하지 않는다
+ * - 이미 넣었으면(첫 메이트가 있으면) 지도·스팟은 그대로 두고, 메이트 취향만 지금 태그 이름으로 다시 붙인다
+ *   (V4 에서 취향 목록을 바꾸면 예전 선택이 지워지므로, DEMO_SEED=true 로 한 번 더 켜면 복구된다)
  * - 메이트 4명 + 공개 지도 5개 + 지난 여행 기록(카드의 "n人が選択" 숫자용)
- * - 취향 태그는 tags 테이블에 같은 이름(name_ko)이 있을 때만 붙인다 (태그 시드 전이면 건너뜀)
+ * - 취향 태그는 tags 테이블에 같은 이름(name_ko)이 있을 때만 붙인다 (2단계 항목·3단계 세부 모두, 태그 시드 전이면 건너뜀)
  */
 @Slf4j
 @Component
@@ -61,14 +62,13 @@ public class DemoDataSeeder {
     /** @return 새로 넣었으면 true, 이미 있으면 false */
     @Transactional
     public boolean seed() {
+        Map<String, Tag> tagByName = tagsByName();
         if (userRepository.existsById(DemoSeedData.MARKER)) {
-            log.info("demo seed: already present, skipped");
+            int relinked = relinkMateTags(tagByName);
+            log.info("demo seed: already present, re-linked tastes of {} mates", relinked);
             return false;
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        Map<String, Tag> tagByName = tagRepository.findAll().stream()
-                .filter(t -> t.getDepth() == 2)
-                .collect(Collectors.toMap(Tag::getNameKo, Function.identity(), (a, b) -> a));
 
         List<PastTraveler> pastTravelers = pastTravelers(now);
         int maps = 0;
@@ -78,10 +78,7 @@ public class DemoDataSeeder {
             mate.registerProfile(m.nickname(), m.gender(), m.birthYear(), null, m.bio());
             mate.verify();
             userRepository.save(mate);
-            for (String name : m.tagNamesKo()) {
-                Tag tag = tagByName.get(name);
-                if (tag != null) userTagRepository.save(UserTag.of(mate.getId(), tag.getId()));
-            }
+            attachTags(mate.getId(), m.tagNamesKo(), tagByName);
             for (MapSeed ms : m.maps()) {
                 SecretMap map = SecretMap.of(mate.getId(), ms.title(), ms.captionKo(), now.minusDays(30 - maps));
                 map.fillTitleTranslation(ms.titleJa());
@@ -105,6 +102,32 @@ public class DemoDataSeeder {
         }
         log.info("demo seed: {} mates, {} maps, {} spots", DemoSeedData.MATES.size(), maps, spots);
         return true;
+    }
+
+    /** 2단계 항목과 3단계 세부를 한국어 이름으로 찾는다 (이름은 V4 시드에서 겹치지 않는다) */
+    private Map<String, Tag> tagsByName() {
+        return tagRepository.findAll().stream()
+                .filter(t -> t.getDepth() >= 2)
+                .collect(Collectors.toMap(Tag::getNameKo, Function.identity(), (a, b) -> a));
+    }
+
+    private void attachTags(java.util.UUID mateId, List<String> names, Map<String, Tag> tagByName) {
+        for (String name : names) {
+            Tag tag = tagByName.get(name);
+            if (tag != null) userTagRepository.save(UserTag.of(mateId, tag.getId()));
+        }
+    }
+
+    /** 이미 들어간 시연 메이트의 취향을 지금 태그로 다시 붙인다. @return 다시 붙인 메이트 수 */
+    private int relinkMateTags(Map<String, Tag> tagByName) {
+        int count = 0;
+        for (MateSeed m : DemoSeedData.MATES) {
+            if (!userRepository.existsById(m.id())) continue;
+            userTagRepository.deleteAllByUserId(m.id());
+            attachTags(m.id(), m.tagNamesKo(), tagByName);
+            count++;
+        }
+        return count;
     }
 
     private record PastTraveler(User user, Long tripId) {

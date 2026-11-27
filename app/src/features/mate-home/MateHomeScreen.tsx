@@ -1,5 +1,6 @@
 // M-20 메이트 홈: 매칭 현황과 여행자 목록.
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
 import { Card, Label, Screen } from "../../ui";
 import { mateHomeApi, type MateHomeApi } from "./api";
 import { LoadError, Loading } from "./LoadStatus";
@@ -10,11 +11,14 @@ import { useLoad } from "./useLoad";
 
 export interface MateHomeScreenProps {
   api?: MateHomeApi;
+  /** 제목 오른쪽에 둘 것 (알림 종) */
+  headerRight?: ReactNode;
   onOpenVisits: (matchId: number) => void;
 }
 
 export function MateHomeScreen({
   api = mateHomeApi,
+  headerRight,
   onOpenVisits,
 }: MateHomeScreenProps) {
   const load = useCallback(
@@ -25,9 +29,12 @@ export function MateHomeScreen({
 
   return (
     <Screen>
-      <Label title language="ko">
-        {strings.homeTitle}
-      </Label>
+      <View style={styles.header}>
+        <Label title language="ko">
+          {strings.homeTitle}
+        </Label>
+        {headerRight}
+      </View>
       {state.status === "loading" && <Loading />}
       {state.status === "error" && (
         <LoadError error={state.error} onRetry={retry} />
@@ -78,3 +85,11 @@ function MatchList({
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+});

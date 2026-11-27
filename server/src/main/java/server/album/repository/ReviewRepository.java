@@ -10,4 +10,7 @@ import java.util.UUID;
 public interface ReviewRepository extends JpaRepository<Review, Long> {
     boolean existsByMatchIdAndReviewerId(Long matchId, UUID reviewerId);
     List<Review> findByMatchIdOrderByIdAsc(Long matchId);
+
+    /** 내가 받은 후기 (C-02a, 최근 순) */
+    List<Review> findByRevieweeIdOrderByCreatedAtDescIdDesc(UUID revieweeId);
 }

@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { useRole, Role } from "../src/state";
 import { Button, Card, Label, Screen } from "../src/ui";
+import { useSession } from "../src/session";
 export default function Country() {
   const router = useRouter();
   const { role, ready, chooseRole } = useRole();
+  const { session, ready: sessionReady, load, busy } = useSession();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [choice, setChoice] = useState<Role | null>(role);
@@ -78,14 +80,22 @@ export default function Country() {
       <Button
         label={choice === "mate" ? "다음" : "次へ"}
         language={choice === "mate" ? "ko" : "ja"}
-        disabled={!ready || !choice || saving}
+        disabled={
+          !ready ||
+          !sessionReady ||
+          busy ||
+          (session !== null && load.kind === "loading") ||
+          !choice ||
+          saving
+        }
         onPress={async () => {
           if (choice && !saving) {
             setSaving(true);
             setSaveError(false);
             try {
               await chooseRole(choice);
-              router.push("/auth");
+              if (session) router.dismissTo("/account");
+              else router.push("/auth");
             } catch {
               setSaveError(true);
             } finally {

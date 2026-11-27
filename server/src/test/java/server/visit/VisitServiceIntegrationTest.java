@@ -23,8 +23,11 @@ import server.trip.repository.TripRepository;
 import server.user.domain.Gender;
 import server.user.domain.User;
 import server.user.repository.UserRepository;
+import server.visit.domain.VisitReaction;
 import server.visit.repository.SpotVisitRepository;
+import server.visit.repository.VisitReactionRepository;
 import server.visit.service.VisitService;
+import server.visit.service.VisitService.CommentRequest;
 import server.visit.service.VisitService.ReactionRequest;
 import server.visit.service.VisitService.VisitRequest;
 
@@ -51,6 +54,7 @@ class VisitServiceIntegrationTest {
     @Autowired SecretMapRepository mapRepository;
     @Autowired SpotRepository spotRepository;
     @Autowired SpotVisitRepository visitRepository;
+    @Autowired VisitReactionRepository reactionRepository;
     @Autowired NotificationRepository notificationRepository;
 
     private static final BigDecimal SPOT_LAT = new BigDecimal("37.5447000");
@@ -86,8 +90,8 @@ class VisitServiceIntegrationTest {
             spotIds.add(spotRepository.save(s).getId());
         }
         Trip trip = tripRepository.save(Trip.of(traveler.getId(), today, today.plusDays(3), now));
-        Match m = Match.create(trip.getId(), traveler.getId(), mate.getId(), now);
-        if (courseSelected) m.selectCourse(map.getId(), 3, now);
+        // API v1.7: 지도 선택 = 매칭 + 코스 확정 (코스 선택 전 상태는 없음)
+        Match m = Match.create(trip.getId(), traveler.getId(), mate.getId(), map.getId(), 3, now);
         m = matchRepository.save(m);
         return new Fixture(traveler, mate, m.getId(), map.getId(), spotIds);
     }
@@ -115,21 +119,22 @@ class VisitServiceIntegrationTest {
         assertThat(first.progress().visited()).isEqualTo(1);
         assertThat(first.progress().required()).isEqualTo(3);
         assertThat(first.progress().total()).isEqualTo(5);
-        assertThat(first.chatRequested()).isFalse();
+        assertThat(first.chatReady()).isFalse();
         assertThat(first.verifiedAt().getOffset().getTotalSeconds()).isEqualTo(9 * 3600);
 
-        assertThat(visitService.verify(traveler, f.matchId(), near(f.spotIds().get(1))).chatRequested()).isFalse();
+        assertThat(visitService.verify(traveler, f.matchId(), near(f.spotIds().get(1))).chatReady()).isFalse();
         var third = visitService.verify(traveler, f.matchId(), near(f.spotIds().get(2)));
-        assertThat(third.chatRequested()).isTrue();
+        assertThat(third.chatReady()).isTrue();
         assertThat(third.progress().visited()).isEqualTo(3);
 
         // 4번째 인증은 이미 요청된 상태라 다시 요청하지 않는다
-        assertThat(visitService.verify(traveler, f.matchId(), near(f.spotIds().get(3))).chatRequested()).isFalse();
+        assertThat(visitService.verify(traveler, f.matchId(), near(f.spotIds().get(3))).chatReady()).isFalse();
 
-        assertThat(matchRepository.findById(f.matchId()).orElseThrow().getChatStatus()).isEqualTo(ChatStatus.REQUESTED);
+        // API v1.7: READY 가 되면 여행자에게만 CHAT_READY (여행자가 바로 연다)
+        assertThat(matchRepository.findById(f.matchId()).orElseThrow().getChatStatus()).isEqualTo(ChatStatus.READY);
         assertThat(notificationsOf(f.mate())).filteredOn(t -> t == NotificationType.VISIT).hasSize(4);
-        assertThat(notificationsOf(f.mate())).filteredOn(t -> t == NotificationType.CHAT_REQUEST).hasSize(1);
-        assertThat(notificationsOf(f.traveler())).filteredOn(t -> t == NotificationType.CHAT_REQUEST).hasSize(1);
+        assertThat(notificationsOf(f.mate())).filteredOn(t -> t == NotificationType.CHAT_READY).isEmpty();
+        assertThat(notificationsOf(f.traveler())).filteredOn(t -> t == NotificationType.CHAT_READY).hasSize(1);
 
         // 메이트도 목록을 본다. 최근 인증 순
         var list = visitService.list(auth(f.mate()), f.matchId());
@@ -137,7 +142,8 @@ class VisitServiceIntegrationTest {
         assertThat(list.get(0).spot().spotId()).isEqualTo(f.spotIds().get(3));
         assertThat(list.get(0).spot().name()).isEqualTo("스팟3");
         assertThat(list.get(0).review().sourceLang()).isEqualTo("ja");
-        assertThat(list.get(0).reactions()).isEmpty();
+        assertThat(list.get(0).reaction()).isNull();
+        assertThat(list.get(0).comments()).isEmpty();
     }
 
     @Test
@@ -172,39 +178,75 @@ class VisitServiceIntegrationTest {
 
     @Test
     void 코스_선택_전이나_끝난_매칭은_인증할_수_없다() {
-        Fixture before = fixture(false);
-        assertError(() -> visitService.verify(auth(before.traveler()), before.matchId(), near(before.spotIds().get(0))),
-                ErrorCode.MATCH_NOT_ON_COURSE);
-
         Fixture canceled = fixture(true);
         Match m = matchRepository.findById(canceled.matchId()).orElseThrow();
-        m.cancel(now);
+        m.cancel(m.getTravelerId(), null, null, now);
         matchRepository.save(m);
         assertError(() -> visitService.verify(auth(canceled.traveler()), canceled.matchId(), near(canceled.spotIds().get(0))),
                 ErrorCode.MATCH_NOT_ON_COURSE);
     }
 
     @Test
-    void 메이트가_리액션을_남기면_여행자에게_알림이_가고_목록에_붙는다() {
+    void 리액션은_하나만_바꾸고_해제하고_댓글은_따로_쌓인다() {
         Fixture f = fixture(true);
         Long visitId = visitService.verify(auth(f.traveler()), f.matchId(), near(f.spotIds().get(0))).visitId();
         AuthUser mate = auth(f.mate());
 
-        Long reactionId = visitService.react(mate, visitId, new ReactionRequest("❤️", " 거기 창가 최고죠! ")).reactionId();
-        visitService.react(mate, visitId, new ReactionRequest("👍", null));
+        assertThat(visitService.setReaction(mate, visitId, new ReactionRequest("LIKE")).reaction()).isEqualTo("LIKE");
+        visitService.setReaction(mate, visitId, new ReactionRequest(" cheer "));        // 바꾸기
+        Long commentId = visitService.comment(mate, visitId, new CommentRequest(" 거기 창가 최고죠! ")).commentId();
+        visitService.comment(mate, visitId, new CommentRequest("다음엔 2층도 가 보세요"));
 
-        var reactions = visitService.list(auth(f.traveler()), f.matchId()).get(0).reactions();
-        assertThat(reactions).hasSize(2);
-        assertThat(reactions.get(0).reactionId()).isEqualTo(reactionId);
-        assertThat(reactions.get(0).comment().original()).isEqualTo("거기 창가 최고죠!");
-        assertThat(reactions.get(0).comment().sourceLang()).isEqualTo("ko");
-        assertThat(reactions.get(1).comment()).isNull();
-        assertThat(notificationsOf(f.traveler())).filteredOn(t -> t == NotificationType.REACTION).hasSize(2);
+        var item = visitService.list(auth(f.traveler()), f.matchId()).get(0);
+        assertThat(item.reaction()).isEqualTo("CHEER");                                  // 하나만 남는다
+        assertThat(item.comments()).hasSize(2);
+        assertThat(item.comments().get(0).commentId()).isEqualTo(commentId);
+        assertThat(item.comments().get(0).content().original()).isEqualTo("거기 창가 최고죠!");
+        assertThat(item.comments().get(0).content().sourceLang()).isEqualTo("ko");
+        // 알림: 처음 리액션 1번 + 댓글 2번 (바꾸기는 알리지 않음)
+        assertThat(notificationsOf(f.traveler())).filteredOn(t -> t == NotificationType.REACTION).hasSize(3);
 
-        assertError(() -> visitService.react(mate, visitId, new ReactionRequest(" ", null)), ErrorCode.VALIDATION_ERROR);
-        assertError(() -> visitService.react(auth(f.traveler()), visitId, new ReactionRequest("❤️", null)), ErrorCode.ROLE_FORBIDDEN);
+        visitService.clearReaction(mate, visitId);
+        visitService.clearReaction(mate, visitId);                                       // 이미 없어도 그대로
+        var cleared = visitService.list(auth(f.mate()), f.matchId()).get(0);
+        assertThat(cleared.reaction()).isNull();
+        assertThat(cleared.comments()).hasSize(2);                                       // 댓글은 그대로
+
+        assertError(() -> visitService.setReaction(mate, visitId, new ReactionRequest("HEART")), ErrorCode.VALIDATION_ERROR);
+        assertError(() -> visitService.setReaction(mate, visitId, new ReactionRequest(null)), ErrorCode.VALIDATION_ERROR);
+        assertError(() -> visitService.comment(mate, visitId, new CommentRequest("  ")), ErrorCode.VALIDATION_ERROR);
+        assertError(() -> visitService.setReaction(auth(f.traveler()), visitId, new ReactionRequest("LIKE")), ErrorCode.ROLE_FORBIDDEN);
         Fixture other = fixture(true);
-        assertError(() -> visitService.react(auth(other.mate()), visitId, new ReactionRequest("❤️", null)), ErrorCode.NOT_MATCH_MEMBER);
-        assertError(() -> visitService.react(mate, -1L, new ReactionRequest("❤️", null)), ErrorCode.VISIT_NOT_FOUND);
+        assertError(() -> visitService.comment(auth(other.mate()), visitId, new CommentRequest("안녕")), ErrorCode.NOT_MATCH_MEMBER);
+        assertError(() -> visitService.setReaction(mate, -1L, new ReactionRequest("LIKE")), ErrorCode.VISIT_NOT_FOUND);
+    }
+
+    @Test
+    void 이전_버전_기록도_댓글은_남기고_리액션은_하나로_정리한다() {
+        Fixture f = fixture(true);
+        Long visitId = visitService.verify(auth(f.traveler()), f.matchId(), near(f.spotIds().get(0))).visitId();
+        AuthUser mate = auth(f.mate());
+        // 이전 버전(v1.6)처럼 이모지+댓글 한 행, 이모지만 한 행을 직접 넣는다
+        VisitReaction mixed = reactionRepository.save(VisitReaction.of(visitId, f.mate().getId(), "❤️", "예전 댓글", now));
+        reactionRepository.save(VisitReaction.of(visitId, f.mate().getId(), "👍", null, now));
+
+        var before = visitService.list(mate, f.matchId()).get(0);
+        assertThat(before.reaction()).isNull();                         // 예전 자유 이모지는 리액션으로 보여 주지 않는다
+        assertThat(before.comments()).extracting(c -> c.content().original()).containsExactly("예전 댓글");
+
+        // 바꾸기: 첫 행만 남아 LIKE 가 되고, 나머지 리액션 행은 정리된다. 댓글은 그대로
+        visitService.setReaction(mate, visitId, new ReactionRequest("LIKE"));
+        var changed = visitService.list(mate, f.matchId()).get(0);
+        assertThat(changed.reaction()).isEqualTo("LIKE");
+        assertThat(changed.comments()).extracting(c -> c.content().original()).containsExactly("예전 댓글");
+        assertThat(reactionRepository.findByVisitIdInOrderByIdAsc(List.of(visitId)))
+                .filteredOn(VisitReaction::isReaction).hasSize(1);
+
+        // 해제: 리액션만 지우고 댓글이 든 행은 남긴다
+        visitService.clearReaction(mate, visitId);
+        var cleared = visitService.list(mate, f.matchId()).get(0);
+        assertThat(cleared.reaction()).isNull();
+        assertThat(cleared.comments()).extracting(c -> c.content().original()).containsExactly("예전 댓글");
+        assertThat(reactionRepository.findById(mixed.getId())).isPresent();
     }
 }

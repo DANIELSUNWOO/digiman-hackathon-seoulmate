@@ -45,11 +45,14 @@ public class Match {
     @Enumerated(EnumType.STRING) @Column(name = "chat_status", nullable = false, length = 20)
     private ChatStatus chatStatus;
 
-    @Column(name = "traveler_chat_ok")
-    private Boolean travelerChatOk;
+    @Enumerated(EnumType.STRING) @Column(name = "cancel_reason", length = 30)
+    private CancelReason cancelReason;
 
-    @Column(name = "mate_chat_ok")
-    private Boolean mateChatOk;
+    @Column(name = "cancel_detail", length = 300)
+    private String cancelDetail;
+
+    @Column(name = "canceled_by")
+    private UUID canceledBy;
 
     @Column(name = "matched_at", nullable = false)
     private LocalDateTime matchedAt;
@@ -60,15 +63,27 @@ public class Match {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
-    public static Match create(Long tripId, UUID travelerId, UUID mateId, LocalDateTime now) {
+    /**
+     * MATCH-01 (API v1.7) 지도 선택 = 매칭 + 코스 확정. 처음부터 ON_COURSE.
+     * required_visits 는 이때 계산해 저장하고, 여행 중에 스팟이 늘어도 바꾸지 않는다.
+     */
+    public static Match create(Long tripId, UUID travelerId, UUID mateId, Long courseMapId, int requiredVisits,
+                               LocalDateTime now) {
         Match m = new Match();
         m.tripId = tripId;
         m.travelerId = travelerId;
         m.mateId = mateId;
-        m.status = MatchStatus.MATCHED;
+        m.courseMapId = courseMapId;
+        m.requiredVisits = requiredVisits;
+        m.status = MatchStatus.ON_COURSE;
         m.chatStatus = ChatStatus.LOCKED;
         m.matchedAt = now;
+        m.courseSelectedAt = now;
         return m;
+    }
+
+    public boolean isTraveler(UUID userId) {
+        return travelerId.equals(userId);
     }
 
     // ---------- 당사자 ----------
@@ -83,20 +98,14 @@ public class Match {
     }
 
     // ---------- 상태 전이 ----------
-    /** MATCH-05 코스 선택. required_visits 를 이때 확정한다. */
-    public void selectCourse(Long mapId, int requiredVisits, LocalDateTime now) {
-        if (!status.isActive()) throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
-        if (status == MatchStatus.ON_COURSE) throw new ApiException(ErrorCode.COURSE_ALREADY_SELECTED);
-        this.courseMapId = mapId;
-        this.requiredVisits = requiredVisits;
-        this.courseSelectedAt = now;
-        moveTo(MatchStatus.ON_COURSE, now, false);
-    }
-
-    /** MATCH-07 여행자 취소 */
-    public void cancel(LocalDateTime now) {
+    /** MATCH-07 매칭 끊기 (API v1.7: 여행자·메이트 모두, 사유는 선택) */
+    public void cancel(UUID by, CancelReason reason, String detail, LocalDateTime now) {
+        if (!isMember(by)) throw new ApiException(ErrorCode.NOT_MATCH_MEMBER);
         if (!status.isActive()) throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
         moveTo(MatchStatus.CANCELED, now, true);
+        this.canceledBy = by;
+        this.cancelReason = reason;
+        this.cancelDetail = detail == null || detail.isBlank() ? null : detail.strip();
     }
 
     /** MATCH-08 여행 완료 / 자동 완료 */
@@ -113,7 +122,7 @@ public class Match {
 
     /**
      * BLOCK-01 차단 (API v1.5: 채팅 여부와 상관없이 언제든).
-     * 진행 중(MATCHED·ON_COURSE)이면 BLOCKED 로 바꾸고 true (여행자 칸 반환).
+     * 진행 중(ON_COURSE)이면 BLOCKED 로 바꾸고 true (여행자 칸 반환).
      * 이미 끝난 매칭이면 상태는 그대로 두고 false (차단 관계만 저장).
      */
     public boolean blockIfActive(LocalDateTime now) {
@@ -128,35 +137,32 @@ public class Match {
         if (ends) this.endedAt = now;
     }
 
-    // ---------- 채팅 ----------
-    /** 방문 인증 수가 필요 수에 도달하면 REQUESTED 로. 처음 도달한 순간에만 true */
-    public boolean requestChatIfReached(long visitedCount) {
+    // ---------- 채팅 (API v1.7) ----------
+    /** 방문 인증 수가 필요 수에 처음 도달한 순간 LOCKED → READY. 그 순간에만 true */
+    public boolean markChatReadyIfReached(long visitedCount) {
         if (chatStatus != ChatStatus.LOCKED || requiredVisits == null) return false;
+        if (!status.isActive()) return false;
         if (visitedCount < requiredVisits) return false;
-        this.chatStatus = ChatStatus.REQUESTED;
+        this.chatStatus = ChatStatus.READY;
         return true;
     }
 
-    /** CHAT-01. 양쪽 모두 true 가 되는 순간 OPEN. 열렸으면 true 반환 */
-    public boolean answerChat(UUID userId, boolean accept) {
-        if (status == MatchStatus.CANCELED || status == MatchStatus.BLOCKED || status == MatchStatus.EXPIRED) {
+    /** CHAT-01 여행자가 채팅 열기. 메이트 수락 단계 없음 */
+    public void openChat(UUID userId) {
+        if (!isMember(userId)) throw new ApiException(ErrorCode.NOT_MATCH_MEMBER);
+        if (!isTraveler(userId)) throw new ApiException(ErrorCode.ROLE_FORBIDDEN);
+        if (status != MatchStatus.ON_COURSE && status != MatchStatus.COMPLETED) {
             throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
         }
-        if (chatStatus == ChatStatus.LOCKED) throw new ApiException(ErrorCode.CHAT_NOT_REQUESTED);
         if (chatStatus == ChatStatus.OPEN) throw new ApiException(ErrorCode.CHAT_ALREADY_OPEN);
-        if (travelerId.equals(userId)) travelerChatOk = accept;
-        else if (mateId.equals(userId)) mateChatOk = accept;
-        else throw new ApiException(ErrorCode.NOT_MATCH_MEMBER);
-
-        if (Boolean.TRUE.equals(travelerChatOk) && Boolean.TRUE.equals(mateChatOk)) {
-            this.chatStatus = ChatStatus.OPEN;
-            return true;
-        }
-        return false;
+        if (chatStatus == ChatStatus.LOCKED) throw new ApiException(ErrorCode.CHAT_NOT_READY);
+        this.chatStatus = ChatStatus.OPEN;
     }
 
-    public Boolean chatAnswerOf(UUID userId) {
-        return travelerId.equals(userId) ? travelerChatOk : mateChatOk;
+    /** MATCH-03 chat.canOpen: 내가 여행자이고 READY */
+    public boolean canOpenChat(UUID viewerId) {
+        return isTraveler(viewerId) && chatStatus == ChatStatus.READY
+                && (status == MatchStatus.ON_COURSE || status == MatchStatus.COMPLETED);
     }
 
     /** 쪽지를 주고받을 수 있는 상태인지 (완료 후에도 가능, 차단·취소·만료면 불가) */

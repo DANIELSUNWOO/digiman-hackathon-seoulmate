@@ -1,6 +1,36 @@
-# 서울메이트 ERD v2.5 (11/26, 요구사항정의서 v3.4 · API 명세서 v1.5 기준)
+# 서울메이트 ERD v2.7 (11/27, 요구사항정의서 v3.5 · API 명세서 v1.9 · DB 마이그레이션 V1~V6 기준)
 
 > Supabase Postgres 기준. 테이블 17개. 로그인 정보(이메일·비밀번호)는 Supabase Auth(auth.users)가 관리하고, 이 문서의 USERS는 서비스용 회원 정보다.
+
+- **실제 DB가 기준이다.** 테이블은 Flyway 마이그레이션(`server/src/main/resources/db/migration`)이 만들고, 이 문서는 그 내용을 사람이 읽기 쉽게 옮긴 것이다. 11/27 Supabase에 V1~V3 적용을 확인했다.
+- `02-erd.png` 그림은 v2.5 기준이다. 아래 0-C의 변경은 그림에 아직 없다.
+
+---
+
+## 0-D. v2.6 → v2.7 변경 (디자이너 최종본 11/26, V4 ~ V6 마이그레이션)
+
+| 변경 | 내용 |
+| --- | --- |
+| TAGS 데이터 교체 (V4) | 분류 11개(CAFE · FOOD · BEAUTY · SHOP · WALK · CULTURE · OSHI_KPOP · OSHI_DRAMA · OSHI_ANIME · OSHI_BASEBALL · AREA) + 항목 63개 + 세부 87개. 테이블 구조는 그대로. 예전 선택(USER_TAGS)은 지워지고 시연 메이트 취향은 다시 붙인다 |
+| REVIEWS.content_translated 추가 (V5) | 상호 후기 번역 |
+| idx_reviews_reviewee 추가 (V5) | 받은 후기 모음(REVIEW-03) 최근 순 조회 |
+| 메이트 verify_status 일괄 VERIFIED (V6, 데이터만) | 메이트는 휴대폰 본인인증으로 가입하고 여권 단계가 없다. 회원 등록 때 바로 VERIFIED |
+
+## 0-C. v2.5 → v2.6 변경 (API v1.7 · 화면 명세 v9 반영, V2 · V3 마이그레이션)
+
+| 변경 | 이유 |
+| --- | --- |
+| SECRET_MAPS.**title_translated** 추가 | 여행자에게 지도 제목을 일본어로 보여 줌 (MAP-07 · 08) |
+| MATCHES.**cancel_reason, cancel_detail, canceled_by** 추가 | 매칭 끊기 사유(선택)와 끊은 사람 (MATCH-07, 여행자 · 메이트 모두 가능) |
+| MATCHES 인덱스 (traveler_id, course_map_id) 추가 | 같은 지도 중복 선택 확인 (`MAP_ALREADY_SELECTED`) |
+| MATCHES.status: 처음부터 **ON_COURSE** | 지도를 고르는 순간 매칭 + 코스 확정. MATCHED는 값으로만 남고 쓰지 않음 |
+| MATCHES.chat_status: LOCKED / **READY** / OPEN | 필요 인증 수 달성 → READY, 여행자가 열면 바로 OPEN (수락 단계 없음) |
+| MATCHES.traveler_chat_ok · mate_chat_ok **사용 안 함** | 데이터 호환을 위해 칼럼만 남김 |
+| required_visits = **내림** (floor) | 5곳 → 2, 6곳 → 3, 7곳 → 3. 지도 선택 시 확정 |
+| VISIT_REACTIONS를 행 종류로 구분 | emoji가 있는 행 = 리액션 (방문 기록당 1개, LIKE · LAUGH · CHEER), comment가 있는 행 = 댓글. 테이블 변경 없음 |
+| NOTIFICATIONS.type: CHAT_REQUEST → **CHAT_READY** | 채팅 열기 가능 알림 (여행자에게만) |
+| TAGS.**category** 사용, V3 시드 | 분류 7개(FOOD · WALK · CULTURE · SHOP · SPORTS · WELLNESS · AREA) + 항목 30개. AREA는 메이트의 "잘 아는 동네" |
+| USERS.nickname 2~**8**자 | 화면 명세 v9 |
 
 ---
 
@@ -146,6 +176,7 @@ erDiagram
     bigint id PK
     uuid mate_id FK
     varchar title
+    varchar title_translated
     text caption
     text caption_translated
     timestamp created_at
@@ -177,15 +208,18 @@ erDiagram
     bigint trip_id FK
     uuid traveler_id FK
     uuid mate_id FK
-    bigint course_map_id FK "코스 선택 전 null"
-    int required_visits "채팅 필요 인증 수, 코스 선택 시 확정"
-    enum status "MATCHED / ON_COURSE / COMPLETED / CANCELED / EXPIRED / BLOCKED"
-    enum chat_status "LOCKED / REQUESTED / OPEN"
-    boolean traveler_chat_ok "null=미응답"
-    boolean mate_chat_ok "null=미응답"
+    bigint course_map_id FK "고른 지도"
+    int required_visits "채팅 필요 인증 수, 지도 선택 시 확정"
+    enum status "ON_COURSE / COMPLETED / CANCELED / EXPIRED / BLOCKED"
+    enum chat_status "LOCKED / READY / OPEN"
+    boolean traveler_chat_ok "사용 안 함"
+    boolean mate_chat_ok "사용 안 함"
     timestamp matched_at
     timestamp course_selected_at
     timestamp ended_at
+    varchar cancel_reason "끊기 사유, 선택"
+    varchar cancel_detail
+    uuid canceled_by FK
   }
   SPOT_VISITS {
     bigint id PK
@@ -200,8 +234,8 @@ erDiagram
     bigint id PK
     bigint visit_id FK
     uuid author_id FK
-    varchar emoji
-    text comment
+    varchar emoji "리액션 행: LIKE / LAUGH / CHEER"
+    text comment "댓글 행"
     text comment_translated
     timestamp created_at
   }
@@ -228,12 +262,13 @@ erDiagram
     uuid reviewee_id FK
     int rating "1~5"
     text content
+    text content_translated
     timestamp created_at
   }
   NOTIFICATIONS {
     bigint id PK
     uuid user_id FK
-    enum type "MATCHED / CANCELED / VISIT / REACTION / CHAT_REQUEST / CHAT_OPEN / EXPIRED / COMPLETED"
+    enum type "MATCHED / CANCELED / VISIT / REACTION / CHAT_READY / CHAT_OPEN / EXPIRED / COMPLETED"
     bigint ref_id "match_id"
     varchar message
     boolean is_read
@@ -269,20 +304,20 @@ erDiagram
 
 | 정책 | 계산 방법 |
 | --- | --- |
-| 여행자 빈 칸 수 | `USERS.match_slots`(기본 5) − 진행 중 매칭 수 (MATCHES.status가 MATCHED 또는 ON_COURSE) |
-| 메이트 정원 (10명) | 진행 중 매칭 수가 10 미만인 메이트만 목록에 표시 |
-| 메이트 공개 조건 | 스팟 5곳 이상 + is_preview 2곳인 지도(= 공개 지도)가 1개 이상 있는 메이트만 목록에 표시 |
-| 목록 제외 대상 | 차단 관계(BLOCKS, 양방향), 정원 초과, 공개 조건 미달, 탈퇴, 이 여행자와 이미 진행 중 매칭이 있는 메이트 |
+| 여행자 빈 칸 수 | `USERS.match_slots`(기본 5) − 진행 중 매칭 수 (MATCHES.status = ON_COURSE) |
+| 메이트 정원 (10건) | 진행 중 매칭 수가 10 미만인 메이트의 지도만 지도 고르기 목록에 표시 |
+| 지도 공개 조건 | 스팟 5곳 이상 + is_preview 정확히 2곳 |
+| 목록 제외 대상 | 차단 관계(BLOCKS, 양방향), 정원 초과, 공개 조건 미달, 탈퇴. 내가 이미 고른 지도는 조건과 상관없이 표시(`myMatchId`) |
 | 매칭 조건 거르기 | gender_pref와 USERS.gender 비교, age_groups에 메이트 연령대 포함 여부 (만 18~19세는 20대로 계산) |
-| 취향 일치순 (기본) | 여행자와 메이트의 USER_TAGS 중 겹치는 tag 수가 많은 순 |
-| 핀 개수 | 지도 하나 기준. 카드 표시·정렬 = 메이트의 공개 지도 중 가장 큰 지도의 SPOTS 개수 / 필터 = 범위 안에 드는 공개 지도가 하나라도 있으면 표시 |
-| 최근 업데이트 순 | 메이트의 공개 지도 SECRET_MAPS.updated_at 중 가장 최근 값 |
-| 인기순 | 메이트의 지도가 코스로 선택된 누적 횟수 (MATCHES.course_map_id가 그 메이트의 지도인 행 수, 상태 무관) |
-| 필요 인증 수 | 코스 선택 시 `required_visits = ceil(코스 지도 SPOTS 개수 × 0.5)` 저장 (5곳 → 3, 6곳 → 3, 7곳 → 4) |
+| 추천순 (기본) | 여행자와 메이트의 USER_TAGS 중 겹치는 tag 수가 많은 순 → 최근 업데이트 → 지도 id |
+| 핀 개수 | 지도 하나의 SPOTS 개수 (카드 1장 = 지도 1개) |
+| 최근 업데이트 순 | SECRET_MAPS.updated_at |
+| 인기순 | 그 지도가 선택된 누적 횟수 (MATCHES.course_map_id = 지도 id인 행 수, 상태 무관) |
+| 필요 인증 수 | 지도 선택 시 `required_visits = floor(SPOTS 개수 × 0.5)` 저장 (5곳 → 2, 6곳 → 3, 7곳 → 3) |
 | 진행률 | 해당 매칭의 SPOT_VISITS 개수 / 코스 지도 SPOTS 개수 |
-| 채팅 요청 | SPOT_VISITS 개수가 required_visits에 도달하는 순간 chat_status = REQUESTED + 양쪽 알림 |
-| 채팅 열림 | traveler_chat_ok, mate_chat_ok 둘 다 true → chat_status = OPEN |
-| 자동 종료 (매일 1회) | TRIPS.end_date < 오늘 + 진행 중 + (코스 미선택 또는 SPOT_VISITS 개수 < required_visits) → status = EXPIRED |
+| 채팅 열기 가능 | SPOT_VISITS 개수가 required_visits에 처음 도달 → chat_status = READY + 여행자에게 CHAT_READY 알림 |
+| 채팅 열림 | 여행자가 열면 바로 chat_status = OPEN + 메이트에게 CHAT_OPEN 알림 |
+| 자동 종료 (매일 00:10) | TRIPS.end_date < 오늘 + status = ON_COURSE + SPOT_VISITS 개수 < required_visits → status = EXPIRED + ALBUMS 1행 생성 |
 | 자동 완료 (같은 배치) | TRIPS.end_date < 오늘 + status = ON_COURSE + SPOT_VISITS 개수 ≥ required_visits → status = COMPLETED + ALBUMS 1행 생성 (제목 = 지도 이름, 표지 = 첫 인증 사진) |
 | 차단 | BLOCKS 저장(사유 필수) + 진행 중이면 해당 MATCHES.status = BLOCKED, 칸 반환. 채팅 여부와 상관없이 언제든 |
 | 차단 피드백 | 차단당한 쪽이 BLOCKS.feedback에 1회 저장 (feedback이 null일 때만) |
@@ -300,7 +335,7 @@ erDiagram
 | REPORTS | (reporter_id, match_id, target_user_id) | 같은 상대 중복 신고 |
 | BLOCKS | (blocker_id, blocked_id) | 중복 차단 |
 
-※ "공개 스팟은 지도당 2곳", "취향은 1~10개"는 DB 제약이 아니라 서버 코드에서 검사합니다.
+※ "공개 스팟은 지도당 2곳", "취향은 1~14개 · 분류당 2개", "리액션은 방문 기록당 1개"는 DB 제약이 아니라 서버 코드에서 검사합니다.
 
 ---
 
@@ -310,14 +345,14 @@ erDiagram
 
 | 이름 | 값 | 의미 |
 | --- | --- | --- |
-| MATE_LIST_PAGE_SIZE | 20 | 메이트 찾기 목록을 한 번에 불러오는 인원 |
+| MAP_LIST_PAGE_SIZE | 20 | 지도 고르기 목록을 한 번에 불러오는 지도 수 (size 1~50) |
 | MATE_MAX_ACTIVE_MATCHES | 10 | 메이트 동시 매칭 상한 |
 | MAP_MIN_SPOTS | 5 | 지도 공개 최소 스팟 수 |
 | MAP_PREVIEW_SPOTS | 2 | 공개 스팟 수 |
-| CHAT_UNLOCK_RATIO | 0.5 | 채팅 요청에 필요한 인증 비율 (코스 스팟 수 × 0.5, 올림) |
+| CHAT_UNLOCK_RATIO | 0.5 | 채팅 열기에 필요한 인증 비율 (코스 스팟 수 × 0.5, 내림) |
 | VISIT_RADIUS_METERS | 200 | 방문 인증 반경 |
 | MAX_MATCH_SLOTS | 5 | 여행자 매칭 칸 (무료) |
-| MAX_TAGS | 10 | 취향 최대 개수 |
+| MAX_TAGS | 14 | 취향 최대 개수 (분류당 2개: 6분류 × 2 + 동네 2). 최신 디자인은 제한 없음 → API 명세서 6장 16번 |
 | MIN_AGE | 18 | 가입 최소 나이 |
 
 ---
@@ -331,7 +366,7 @@ erDiagram
 | country | char | JP / KR. 국적 선택 결과 |
 | role | enum | TRAVELER(JP) / MATE(KR). country로 자동 지정 |
 | language | char | ja / ko. 화면 언어, 번역 방향 |
-| nickname | varchar UK | 2~12자 |
+| nickname | varchar UK | 2~8자 |
 | gender | enum | MALE / FEMALE |
 | birth_year | int | 연령대 계산, 만 18세 이상 |
 | profile_image_url, bio | | 프로필 |
@@ -352,7 +387,8 @@ erDiagram
 | --- | --- | --- |
 | TAGS.parent_id | bigint FK | 상위 취향 (카페 → 조용한 카페). 최상위는 null |
 | TAGS.name_ko, name_ja | varchar | 언어별 표시 이름 |
-| TAGS.depth | int | 1 = 대분류, 2 = 세부 |
+| TAGS.category | varchar | 분류 코드 FOOD / WALK / CULTURE / SHOP / SPORTS / WELLNESS / AREA(동네) |
+| TAGS.depth | int | 1 = 대분류, 2 = 항목 (3단계 세부는 결선 버전에 없음) |
 | USER_TAGS.(user_id, tag_id) | 복합 PK | 여행자는 여행 취향, 메이트는 추천 가능한 취향·동네 |
 
 ### TRIPS (여행 일정)
@@ -366,24 +402,26 @@ erDiagram
 | --- | --- | --- |
 | SECRET_MAPS.mate_id | uuid FK | 한 메이트가 여러 지도 생성 |
 | SECRET_MAPS.title, caption | | 지도 이름과 캡션 |
+| SECRET_MAPS.title_translated | varchar | 지도 이름 일본어 번역 |
 | SECRET_MAPS.caption_translated | text | 일본어 번역 |
 | SECRET_MAPS.updated_at | timestamp | 지도·스팟이 추가·수정된 마지막 시각 ("최근 업데이트 순") |
 | SPOTS.lat, lng | decimal | **스팟의 위치** (방문 인증 반경 계산 기준). 여행자 위치가 아님 |
 | SPOTS.reason, review | text | 추천 이유, 메이트 후기 |
 | SPOTS.*_translated | text | 일본어 번역 |
-| SPOTS.is_preview | boolean | 매칭 직후 먼저 보여 줄 2곳 (메이트가 지정) |
-| SPOT_PHOTOS.url | varchar | 스팟 사진 여러 장 |
+| SPOTS.is_preview | boolean | 매칭 전에도 여행자에게 보이는 공개 스팟 2곳 (메이트가 지정) |
+| SPOT_PHOTOS.url | varchar | 스팟 사진 1~3장 |
 
 ### MATCHES (매칭)
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | trip_id | bigint FK | 칸이 여러 개면 한 여행에 매칭 여러 건 가능 |
 | traveler_id, mate_id | uuid FK | |
-| course_map_id | bigint FK | 코스로 고른 지도. 고르기 전에는 null |
-| status | enum | MATCHED(지도 검토 중) → ON_COURSE(여행 중) → COMPLETED(여행 완료 또는 자동 완료) / CANCELED(여행자 취소) / EXPIRED(기간 만료, 인증 50% 미만) / BLOCKED(차단) |
-| required_visits | int | 채팅에 필요한 인증 수. 코스 선택 시 확정, 그 전에는 null |
-| chat_status | enum | LOCKED → REQUESTED(필요 인증 수 달성) → OPEN(양쪽 수락) |
-| traveler_chat_ok, mate_chat_ok | boolean (null 허용) | 채팅 열기 응답. null = 미응답, true = 수락, false = 거절 |
+| course_map_id | bigint FK | 여행자가 고른 지도 (지도 1개 = 매칭 1개) |
+| status | enum | ON_COURSE(여행 중, 지도 선택 즉시) → COMPLETED(여행 완료 또는 자동 완료) / CANCELED(매칭 끊기, 여행자 · 메이트) / EXPIRED(기간 만료, 인증 50% 미만) / BLOCKED(차단). MATCHED는 쓰지 않음 |
+| required_visits | int | 채팅에 필요한 인증 수. 지도 선택 시 확정 (내림) |
+| chat_status | enum | LOCKED → READY(필요 인증 수 달성) → OPEN(여행자가 열면 바로) |
+| traveler_chat_ok, mate_chat_ok | boolean (null 허용) | v1.7부터 사용 안 함 (칼럼만 남김) |
+| cancel_reason, cancel_detail, canceled_by | varchar, varchar, uuid FK | 매칭 끊기 사유(선택, 7종)와 상세, 끊은 사람 |
 | matched_at, course_selected_at, ended_at | timestamp | |
 
 ### SPOT_VISITS / VISIT_REACTIONS (방문 인증과 리액션)
@@ -394,7 +432,8 @@ erDiagram
 | SPOT_VISITS.review_translated | text | 메이트가 볼 한국어 번역 |
 | SPOT_VISITS.verified_at | timestamp | 인증 시각 = 메이트 공개 시각. **여행자 위치는 저장하지 않음** |
 | VISIT_REACTIONS.author_id | uuid FK | 메이트 |
-| VISIT_REACTIONS.emoji, comment, comment_translated | | 리액션, 댓글, 일본어 번역. 앨범에 들어감 |
+| VISIT_REACTIONS.emoji | varchar | 리액션 행: LIKE / LAUGH / CHEER, 방문 기록당 1개 (바꾸기 · 해제 가능) |
+| VISIT_REACTIONS.comment, comment_translated | text | 댓글 행: 댓글과 일본어 번역. 리액션 · 댓글 모두 앨범에 들어감 |
 
 ### CHAT_MESSAGES (쪽지)
 | 컬럼 | 타입 | 설명 |
@@ -410,11 +449,12 @@ erDiagram
 | ALBUMS.title, cover_url | | 제목과 표지 |
 | REVIEWS.reviewer_id, reviewee_id | uuid FK | 서로에 대한 후기 |
 | REVIEWS.rating | int | 1~5 |
+| REVIEWS.content_translated | text | 후기 번역 (V5, 받는 사람 언어). 받은 후기 모음(REVIEW-03)은 reviewee_id로 최근 순 조회 (인덱스 idx_reviews_reviewee) |
 
 ### NOTIFICATIONS (앱 안 알림)
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
-| type | enum | MATCHED / CANCELED / VISIT / REACTION / CHAT_REQUEST / CHAT_OPEN / EXPIRED / COMPLETED |
+| type | enum | MATCHED / CANCELED / VISIT / REACTION / CHAT_READY / CHAT_OPEN / EXPIRED / COMPLETED |
 | ref_id | bigint | 관련 매칭 id(match_id). 앱은 type + match_id로 이동할 화면을 정함 |
 | message, is_read | | |
 
@@ -423,9 +463,9 @@ erDiagram
 | --- | --- | --- |
 | REPORTS.target_type, target_id | | 무엇을 신고했는지 (PROFILE / VISIT / COMMENT / CHAT) |
 | REPORTS.reason, detail, status | | 사유, 상세, 처리 상태 |
-| BLOCKS.(blocker_id, blocked_id) | 복합 PK | 차단 관계. 이후 메이트 찾기 목록에서 서로 제외 |
+| BLOCKS.(blocker_id, blocked_id) | 복합 PK | 차단 관계. 이후 지도 고르기 목록에서 서로 제외 |
 | BLOCKS.match_id | bigint FK | 어느 매칭에서 차단했는지 |
-| BLOCKS.reason, detail | | 차단 사유(ABUSIVE / SEXUAL / CONTACT_REQUEST / SPAM / OTHER, 신고와 같은 목록, 필수)와 상세 |
+| BLOCKS.reason, detail | | 차단 사유(ABUSIVE / CONTACT_REQUEST / FORCED_MEETING / SEXUAL / SPAM / OTHER, 신고와 같은 목록, 필수)와 상세 |
 | BLOCKS.feedback, feedback_at | | 차단당한 쪽의 의견. MVP는 저장만, 판단·불이익은 확장 기능 |
 
 ---
@@ -439,7 +479,7 @@ erDiagram
 | F-08 (매칭 조건) | MATCH_PREFERENCES |
 | F-09 (여행 일정) | TRIPS |
 | F-10~F-14 (비밀지도) | SECRET_MAPS, SPOTS, SPOT_PHOTOS |
-| F-15, F-16 (메이트 찾기) | 저장 테이블 없음. USERS, USER_TAGS, MATCH_PREFERENCES, SECRET_MAPS, SPOTS, MATCHES, BLOCKS로 요청 시 계산 |
+| F-15, F-16 (지도 고르기 · 공개 스팟 미리보기) | 저장 테이블 없음. USERS, USER_TAGS, MATCH_PREFERENCES, SECRET_MAPS, SPOTS, MATCHES, BLOCKS로 요청 시 계산 |
 | F-17~F-24 (매칭·칸·취소·상한·자동 종료·자동 완료) | MATCHES, USERS.match_slots |
 | F-25~F-28 (탐방·인증·리액션) | SPOT_VISITS, VISIT_REACTIONS |
 | F-29~F-31 (채팅) | MATCHES.chat_*, CHAT_MESSAGES |

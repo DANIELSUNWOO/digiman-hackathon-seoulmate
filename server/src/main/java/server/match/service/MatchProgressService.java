@@ -14,10 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
  * [서버 B → 서버 A 호출용] 방문 인증(VISIT-01)을 저장한 직후 같은 트랜잭션에서 호출한다.
  *
  *   SpotVisit saved = spotVisitRepository.saveAndFlush(...);
- *   boolean chatRequested = matchProgressService.onVisitVerified(matchId);
- *   // 응답의 chatRequested 에 그대로 넣는다
+ *   boolean chatReady = matchProgressService.onVisitVerified(matchId);
+ *   // 응답의 chatReady 에 그대로 넣는다
  *
- * 인증 수가 required_visits 에 처음 도달한 순간 chat_status = REQUESTED 로 바꾸고 양쪽에 CHAT_REQUEST 알림.
+ * API v1.7: 인증 수가 required_visits(코스 스팟 50% 내림)에 처음 도달한 순간 chat_status = READY 로 바꾸고
+ * 여행자에게만 CHAT_READY 알림 (여행자가 CHAT-01 로 바로 연다. 메이트 수락 없음).
+ * 반환값 true = 이번 인증으로 READY 가 됨 (VISIT-01 응답에 그대로 쓰면 된다).
  */
 @Service
 @RequiredArgsConstructor
@@ -31,9 +33,8 @@ public class MatchProgressService {
     public boolean onVisitVerified(Long matchId) {
         Match m = matchRepository.findByIdForUpdate(matchId).orElseThrow();
         long visited = visitQuery.countByMatch(matchId);
-        if (!m.requestChatIfReached(visited)) return false;
-        notificationPublisher.publish(m.getTravelerId(), NotificationType.CHAT_REQUEST, matchId);
-        notificationPublisher.publish(m.getMateId(), NotificationType.CHAT_REQUEST, matchId);
+        if (!m.markChatReadyIfReached(visited)) return false;
+        notificationPublisher.publish(m.getTravelerId(), NotificationType.CHAT_READY, matchId);
         return true;
     }
 }

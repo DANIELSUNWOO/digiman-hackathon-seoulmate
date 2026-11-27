@@ -17,7 +17,6 @@ import server.notification.service.NotificationPublisher;
 import server.user.domain.User;
 import server.user.repository.UserRepository;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import server.translation.TranslationService;
@@ -30,7 +29,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 
-/** 티켓 6: 채팅 열기 요청·양쪽 수락, 쪽지 */
+/** 티켓 6: 채팅 열기(여행자, 50% 달성 후), 쪽지 */
 @Service
 @RequiredArgsConstructor
 public class ChatService {
@@ -44,17 +43,16 @@ public class ChatService {
     private final TranslationService translationService;
     private final Clock clock;
 
-    /** CHAT-01 채팅 열기 수락/거절. 양쪽 모두 수락하는 순간 OPEN + 양쪽 CHAT_OPEN 알림. 거절 후 다시 수락 가능 */
+    /**
+     * CHAT-01 채팅 열기 (API v1.7). 필요 인증 수를 채워 READY 가 되면 여행자가 누르는 순간 바로 OPEN.
+     * 메이트 수락 단계는 없다. 메이트에게 CHAT_OPEN 알림 (M-30).
+     */
     @Transactional
-    public AcceptResponse answer(AuthUser me, Long matchId, boolean accept) {
+    public OpenResponse open(AuthUser me, Long matchId) {
         Match m = matchAccess.memberForUpdate(matchId, me);
-        boolean opened = m.answerChat(me.id(), accept);
-        if (opened) {
-            notificationPublisher.publish(m.getTravelerId(), NotificationType.CHAT_OPEN, matchId);
-            notificationPublisher.publish(m.getMateId(), NotificationType.CHAT_OPEN, matchId);
-        }
-        return new AcceptResponse(m.getChatStatus().name(), m.chatAnswerOf(me.id()),
-                Boolean.TRUE.equals(m.chatAnswerOf(m.partnerOf(me.id()))));
+        m.openChat(me.id());                 // ROLE_FORBIDDEN / CHAT_NOT_READY / CHAT_ALREADY_OPEN / MATCH_NOT_ACTIVE
+        notificationPublisher.publish(m.getMateId(), NotificationType.CHAT_OPEN, matchId);
+        return new OpenResponse(m.getId(), m.getChatStatus().name());
     }
 
     /** CHAT-02 쪽지 목록 (오래된 순). 앱은 5~10초마다 after=마지막 messageId 로 새 쪽지만 가져온다 */
@@ -97,8 +95,7 @@ public class ChatService {
                 Times.kst(c.getCreatedAt()), Times.kst(c.getReadAt()));
     }
 
-    public record AcceptRequest(@NotNull Boolean accept) {}
-    public record AcceptResponse(String chatStatus, Boolean myAccept, boolean partnerAccepted) {}
+    public record OpenResponse(Long matchId, String chatStatus) {}
     public record SendRequest(@NotBlank @Size(max = 500, message = "500자까지 보낼 수 있습니다.") String content) {}
     public record MessageView(Long messageId, UUID senderId, boolean mine, LocalizedText content,
                               OffsetDateTime createdAt, OffsetDateTime readAt) {}

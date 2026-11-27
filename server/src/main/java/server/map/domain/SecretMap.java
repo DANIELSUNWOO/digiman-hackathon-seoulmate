@@ -3,6 +3,7 @@ package server.map.domain;
 import java.util.UUID;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.DynamicUpdate;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 /** [서버 B 소유] 비밀지도. 서버 A는 코스 선택·지도 목록에서 읽기만 한다. */
 @Entity
 @Table(name = "secret_maps")
+@DynamicUpdate   // 바뀐 칸만 UPDATE: 번역 저장과 사용자 수정이 겹쳐도 서로의 값을 덮지 않는다
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SecretMap {
@@ -24,6 +26,10 @@ public class SecretMap {
 
     @Column(nullable = false, length = 30)
     private String title;
+
+    /** 여행자에게 보여 줄 일본어 제목 (ERD v2.6, V2 마이그레이션) */
+    @Column(name = "title_translated", length = 100)
+    private String titleTranslated;
 
     @Column(columnDefinition = "TEXT")
     private String caption;
@@ -49,11 +55,13 @@ public class SecretMap {
     }
 
     public void edit(String title, String caption) {
-        if (title != null) this.title = title;
+        if (title != null && !title.equals(this.title)) { this.title = title; this.titleTranslated = null; }
         if (caption != null) { this.caption = caption; this.captionTranslated = null; }
     }
 
     public void fillTranslation(String translated) { this.captionTranslated = translated; }
+
+    public void fillTitleTranslation(String translated) { this.titleTranslated = translated; }
 
     /** 지도 또는 그 지도의 스팟이 바뀌면 서버 B가 호출 */
     public void touch(LocalDateTime now) { this.updatedAt = now; }

@@ -1,5 +1,5 @@
 import { Redirect, useRouter } from "expo-router";
-import { CaretLeft, Camera, Info, UserSquare } from "phosphor-react-native";
+import { Camera, CaretLeft, UserSquare } from "phosphor-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -25,8 +25,21 @@ import {
 } from "../../src/features/onboarding/photo";
 import { useSession } from "../../src/session";
 import { theme } from "../../src/theme";
-import { Button, Label, Screen } from "../../src/ui";
+import {
+  AppBar,
+  Button,
+  ErrorNotice,
+  Label,
+  Notice,
+  ProgressTracker,
+  Screen,
+  ScreenFooter,
+  TextLink,
+} from "../../src/ui";
 import { nextStep, onboardingRouteFor } from "../../src/users";
+
+const TRAVELER_STEPS = ["本人確認", "基本情報", "好み", "条件", "日程"];
+const PASSPORT_ASPECT_RATIO = 125 / 88;
 
 export default function VerificationScreen() {
   const router = useRouter();
@@ -206,22 +219,33 @@ export default function VerificationScreen() {
   }
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={copy.backLabel}
-          disabled={busy}
-          onPress={handleBack}
-          style={styles.backButton}
-        >
-          <CaretLeft size={theme.size.icon} color={theme.color.text} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { fontFamily: boldFont }]}>
-          {copy.headerTitle}
-        </Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <Screen contentStyle={styles.content}>
+      {ko ? (
+        <AppBar
+          title={copy.headerTitle}
+          language={language}
+          backLabel={copy.backLabel}
+          backDisabled={busy}
+          onBack={handleBack}
+        />
+      ) : (
+        <View style={styles.onboardingTop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.backLabel}
+            disabled={busy}
+            onPress={handleBack}
+            style={styles.backButton}
+          >
+            <CaretLeft size={theme.size.icon} color={theme.color.labelNormal} />
+          </Pressable>
+          <ProgressTracker
+            steps={TRAVELER_STEPS}
+            currentIndex={0}
+            language="ja"
+          />
+        </View>
+      )}
 
       <View style={styles.intro}>
         <Label title language={language}>
@@ -248,7 +272,7 @@ export default function VerificationScreen() {
               </Text>
               <View style={styles.sampleBody}>
                 <View style={styles.sampleAvatar}>
-                  <UserSquare size={36} color={theme.color.medium} />
+                  <UserSquare size={36} color={theme.color.labelAssist} />
                 </View>
                 <View style={styles.sampleLines}>
                   <View style={[styles.sampleBar, { width: "85%" }]} />
@@ -264,11 +288,8 @@ export default function VerificationScreen() {
         </View>
       </View>
 
-      <View style={styles.infoBox}>
-        <Info size={theme.size.iconSmall} color={theme.color.text} />
-        <Text style={[styles.infoText, { fontFamily: bodyFont }]}>
-          {copy.infoText}
-        </Text>
+      <View style={styles.noticeWrap}>
+        <Notice language={language}>{copy.infoText}</Notice>
       </View>
 
       <View style={styles.pickerRow}>
@@ -293,120 +314,108 @@ export default function VerificationScreen() {
       </View>
 
       {!!errorText && (
-        <Text
-          accessibilityLiveRegion="polite"
-          style={[styles.errorText, { fontFamily: bodyFont }]}
-        >
-          {errorText}
-        </Text>
+        <View style={styles.errorWrap}>
+          <ErrorNotice language={language}>{errorText}</ErrorNotice>
+        </View>
       )}
 
-      {refreshFailed ? (
-        <Button
-          language={language}
-          disabled={locked}
-          label={locked ? copy.submitting : copy.retryRefresh}
-          onPress={() => void handleRetryRefresh()}
-        />
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: locked }}
-          disabled={locked}
-          onPress={() => void handleVerify()}
-          style={[styles.primaryButton, locked && styles.primaryDisabled]}
-        >
-          <Camera
-            size={theme.size.iconSmall}
-            color={locked ? theme.color.muted : theme.color.text}
+      <ScreenFooter>
+        {submitting && (
+          <View style={styles.cancelRow}>
+            <TextLink
+              variant="quiet"
+              language={language}
+              label={copy.cancelButton}
+              onPress={handleCancelSubmit}
+            />
+          </View>
+        )}
+        {refreshFailed ? (
+          <Button
+            language={language}
+            loading={submitting}
+            disabled={locked}
+            label={locked ? copy.submitting : copy.retryRefresh}
+            onPress={() => void handleRetryRefresh()}
           />
-          <Text
-            style={[
-              styles.primaryLabel,
-              { fontFamily: boldFont },
-              locked && { color: theme.color.muted },
-            ]}
-          >
-            {locked
-              ? copy.submitting
-              : selectedSample
-                ? copy.submitSelectedButton
-                : copy.demoButton}
-          </Text>
-        </Pressable>
-      )}
-
-      {submitting && (
-        <Button
-          secondary
-          language={language}
-          label={copy.cancelButton}
-          onPress={handleCancelSubmit}
-        />
-      )}
+        ) : (
+          <Button
+            language={language}
+            loading={submitting}
+            disabled={locked}
+            icon={
+              <Camera size={theme.size.iconSmall} color={theme.color.surface} />
+            }
+            label={
+              locked
+                ? copy.submitting
+                : selectedSample
+                  ? copy.submitSelectedButton
+                  : copy.demoButton
+            }
+            onPress={() => void handleVerify()}
+          />
+        )}
+      </ScreenFooter>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: theme.size.appbar,
+  content: {
+    gap: 0,
+  },
+  onboardingTop: {
+    gap: theme.space.xs,
   },
   backButton: {
     width: theme.size.touchMin,
     height: theme.size.touchMin,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
   },
-  headerTitle: {
-    fontSize: theme.typography.title2.fontSize,
-    lineHeight: theme.typography.title2.lineHeight,
-    color: theme.color.text,
-  },
-  headerSpacer: {
-    width: theme.size.touchMin,
-    height: theme.size.touchMin,
-  },
   intro: {
+    marginTop: theme.space.md,
     gap: theme.space.sm,
   },
   desc: {
-    fontSize: theme.typography.body2.fontSize,
-    lineHeight: theme.typography.body2.lineHeight,
-    color: theme.color.muted,
+    fontSize: theme.typography.desc.fontSize,
+    lineHeight: theme.typography.desc.lineHeight,
+    color: theme.color.labelDesc,
   },
   frameOuter: {
-    backgroundColor: "#2C2C2C",
+    marginTop: theme.space.group,
+    backgroundColor: "#2B2D33",
     borderRadius: theme.radius.card,
-    padding: theme.space.lg,
+    padding: theme.space.md,
   },
   frameDashed: {
+    width: "100%",
+    aspectRatio: PASSPORT_ASPECT_RATIO,
     borderWidth: 2,
     borderStyle: "dashed",
-    borderColor: theme.color.white,
+    borderColor: theme.color.surface,
     borderRadius: theme.radius.input,
-    padding: theme.space.lg,
-    minHeight: 184,
+    padding: theme.space.md,
     justifyContent: "center",
     overflow: "hidden",
   },
   previewImage: {
     width: "100%",
-    height: 164,
+    height: "100%",
     borderRadius: theme.radius.sm,
   },
   passportSample: {
-    backgroundColor: "rgba(255, 255, 255, 0.16)",
+    flex: 1,
+    width: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.14)",
     borderRadius: theme.radius.sm,
     padding: theme.space.md,
-    gap: theme.space.sm,
+    justifyContent: "space-between",
   },
   passportBadge: {
     alignSelf: "flex-end",
-    fontSize: theme.typography.caption2.fontSize,
+    fontSize: theme.typography.status.fontSize,
     color: "rgba(255, 255, 255, 0.85)",
   },
   sampleBody: {
@@ -415,8 +424,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sampleAvatar: {
-    width: 56,
-    height: 68,
+    width: 52,
+    height: 64,
     borderRadius: theme.radius.xs,
     backgroundColor: "rgba(255, 255, 255, 0.2)",
     alignItems: "center",
@@ -432,51 +441,25 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.25)",
   },
   mrzText: {
-    fontSize: 11,
-    color: "rgba(255, 255, 255, 0.72)",
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.78)",
     letterSpacing: 0.6,
   },
-  infoBox: {
-    flexDirection: "row",
-    gap: theme.space.sm,
-    alignItems: "flex-start",
-    backgroundColor: theme.color.background,
-    borderRadius: theme.radius.input,
-    padding: theme.space.lg,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: theme.typography.caption1.fontSize,
-    lineHeight: theme.typography.caption1.lineHeight,
-    color: theme.color.text,
+  noticeWrap: {
+    marginTop: theme.space.lg,
   },
   pickerRow: {
+    marginTop: theme.space.md,
     flexDirection: "row",
     gap: theme.space.sm,
   },
   pickerCol: {
     flex: 1,
   },
-  errorText: {
-    fontSize: theme.typography.caption1.fontSize,
-    lineHeight: theme.typography.caption1.lineHeight,
-    color: theme.color.dangerInk,
+  errorWrap: {
+    marginTop: theme.space.md,
   },
-  primaryButton: {
-    minHeight: theme.size.button,
-    borderRadius: theme.radius.card,
-    backgroundColor: theme.color.main,
-    flexDirection: "row",
+  cancelRow: {
     alignItems: "center",
-    justifyContent: "center",
-    gap: theme.space.sm,
-    paddingHorizontal: theme.space.lg,
-  },
-  primaryDisabled: {
-    backgroundColor: theme.color.border,
-  },
-  primaryLabel: {
-    fontSize: 15,
-    color: theme.color.text,
   },
 });

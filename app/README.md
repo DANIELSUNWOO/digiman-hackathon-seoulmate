@@ -1,6 +1,6 @@
 # 서울메이트 앱 공통 기반
 
-Expo와 TypeScript 설정, 한국어 및 일본어 폰트, 공통 디자인 토큰과 UI, 국적 선택 및 역할별 진입 화면을 제공합니다. 이메일 가입과 로그인, Spring 회원 등록 및 조회, 등록 복구와 온보딩 단계 판정을 구현했습니다. 소셜 로그인과 온보딩 본 화면 및 각 탭의 기능은 준비 중입니다. Refs #8. 앱 B의 지도 작업 #7에서 사용할 선행 기반입니다.
+Expo와 TypeScript 설정, 한국어 및 일본어 폰트, 공통 디자인 토큰과 UI, 국적 선택 및 역할별 진입 화면을 제공합니다. 이메일 가입과 로그인, Spring 회원 등록 및 조회, 등록 복구와 온보딩 1차 화면(본인 인증 시연, 프로필 등록)을 구현했습니다. 소셜 로그인과 취향, 매칭 조건, 여행 일정 및 각 탭의 본 화면은 후속 작업입니다. Refs #8, #22.
 
 ## 시작
 
@@ -20,7 +20,7 @@ import { View } from "react-native";
 import { theme } from "../src/theme";
 import { Label } from "../src/ui";
 
-export function Notice() {
+export function NoticeBox() {
   return (
     <View style={{ padding: theme.space.lg }}>
       <Label>준비 중입니다</Label>
@@ -31,25 +31,23 @@ export function Notice() {
 
 공통 `Label`은 선택한 역할에 맞춰 폰트를 적용합니다. `theme.typography`에는 폰트 패밀리가 포함되지 않으므로 React Native `Text`에 해당 스타일만 적용해도 폰트가 자동 선택되지는 않습니다.
 
-## 디자인 기준과 후속 작업
+## 디자인 기준 (v2 블루, DESIGN.md v3.0)
 
-디자인 기준은 전달된 DESIGN.md v1.7이며 토큰 JSON과 CSS도 대조했습니다. 전달 ZIP의 README는 실제 값에서 `02_tokens`를 우선합니다. 이에 따라 DESIGN.md 표의 display 800과 body-2 600 대신 토큰 파일의 display 700과 body-2-medium 500을 사용했습니다. 색상과 역할, 최소 글자 크기 및 터치 크기는 확정 기준입니다. 간격과 반경, 그림자, 모션 및 일부 타입 규칙은 원문에서 추정 또는 제안으로 표시되어 있어 확정된 팀 규칙으로 단정하지 않습니다. 화면 배치는 와이어프레임을 따릅니다. 일본어 로고용 LINE Seed JP 폰트는 아직 포함하지 않아 대체 폰트로 표시됩니다.
+현재 디자인 기준은 개발 전달 패키지 v4의 `DESIGN.md` v3.0과 `02_tokens/tokens.flat.json`, `03_fonts/FONTS.md`입니다. 이전 오렌지와 노랑 기반 v1 기준은 폐기했습니다.
 
-`app.json`에는 임의의 owner, projectId, Android package나 iOS bundleId를 넣지 않았습니다. `eas.json`은 내부 배포용 development client 프로필만 정의합니다. Expo 계정 연결, 식별자와 자격 증명, EAS 빌드 및 실제 기기 검증은 후속 작업입니다. 지도 라이브러리 설치는 앱 B 작업 범위입니다.
+- **색상과 접근성:** `brand` `#477EFF`, `brandDeep` `#2F6BF0`, `brandTint` `#F0F5FF`, `accent` `#FFD84D` 등 35개 블루 v2 의미 토큰을 `src/theme.ts`에 정의했습니다. `accent` 노랑 포인트는 글자색으로 쓰지 않습니다.
+- **앱 B 호환 별칭:** 열린 앱 B PR의 빌드와 동작을 깨뜨리지 않기 위해 기존 `main`, `mainSoft`, `mainInk`, `orange`, `tealSoft`, `tealInk` 등 v1 키를 유지하고 블루 v2 의미 색으로 매핑했습니다. 특히 `orange`는 알림 배지의 어두운 숫자 대비를 유지하기 위해 `accent` `#FFD84D`로 유지했으므로, 앱 B 후속 정리 시 각 의미에 맞는 블루 토큰(`brandDeep`, `positiveSoft`, `positive`)으로 전환해야 합니다.
+- **폰트와 라이선스:** 본문은 역할별 `Noto Sans KR`과 `Noto Sans JP`(400, 500, 600, 700)를 사용합니다. 워드마크는 한국어 `Cafe24 Ssurround`(`assets/fonts/Cafe24Ssurround.ttf`, 라이선스 [CAFE24-OFL.txt](assets/fonts/CAFE24-OFL.txt))와 일본어 `Zen Maru Gothic 900`(`@expo-google-fonts/zen-maru-gothic`)을 사용합니다. 기존 `LINESeedKR-Bd.ttf`와 `OFL.txt`는 저장소 호환을 위해 보존하되 화면에서는 로드하지 않습니다.
+- **공통 UI:** `src/ui.tsx`의 기존 컴포넌트(`Screen`, `Label`, `Button`, `Card`, `Input`, `Chip`, `BottomSheet`)와 props 호환을 유지한 채 블루 스타일(버튼 높이 52 반경 10, 입력창 흰 배경과 포커스 테두리, 선택 칩 `brandDeep` 채움과 흰 글자, 시트 상단 반경 20)을 적용했고, 현재 화면에 쓰는 `AppBar`, `Notice`, `ProgressTracker`, `TextLink`와 `src/brandAssets.tsx`의 B안 S코스 로고 및 국적 일러스트를 추가했습니다.
+- **미정 및 범위 구분:** 스플래시 슬로건과 로그인 상단 서울 낮 전경 사진은 팀 최종본 확정 전 임시 표현입니다. `app.json`에는 임의의 owner, projectId, Android package나 iOS bundleId를 넣지 않았고 `eas.json`은 development client 프로필만 정의합니다.
 
-`.env.example`은 인증과 지도 연동을 위한 설정 예시입니다. `EXPO_PUBLIC_` 값은 앱에 포함되므로 공개 가능한 값만 사용하고 비밀 키, DB 비밀번호와 LLM 키를 넣지 않습니다. 실제 인증에는 접근 가능한 Spring API 주소 및 약관 자료 확인이 필요합니다. 실제 인증 성공, 실제 서버 연동과 네이티브 기기 동작은 검증되지 않았습니다. 회원 조회 결과가 온보딩 미완료이면 계정 화면에서 다음 단계를 안내하며 미구현 화면으로 이동하지 않습니다.
-
-한국어 로고 폰트 `LINESeedKR-Bd.ttf`의 라이선스 원문은 [OFL.txt](assets/fonts/OFL.txt)에 동봉했습니다. 출처는 [LINE Seed 공식 저장소](https://github.com/line/seed/blob/main/OFL.txt)입니다.
-
-공통 `Label`의 `weight="medium"`으로 역할별 Noto Sans 500 폰트를 선택할 수 있습니다. `language`로 언어를 명시할 수 있으며 `Button`도 같은 언어 옵션을 지원합니다. 선택 카드와 칩은 각각 다른 배경색을 사용합니다. 네이티브 기기에서 폰트와 그림자 표시를 확인하지 않았으며 Android elevation과 위험 상태 변형은 후속 화면 요구에 맞춰 결정해야 합니다.
-
-`Card`를 선택 상태로 표시할 때 내부 `Label`에도 같은 `selected` 값을 전달하면 선택 글자색을 적용합니다. `Chip`은 자체 선택 상태에 맞춰 배경과 글자색 및 굵기를 처리합니다.
+`.env.example`은 인증과 지도 연동을 위한 설정 예시입니다. `EXPO_PUBLIC_` 값은 앱에 포함되므로 공개 가능한 값만 사용하고 비밀 키, DB 비밀번호와 LLM 키를 넣지 않습니다.
 
 ## 온보딩 1차 구현 (본인 인증 시연 및 프로필 등록)
 
-여행자(`T-03`, `T-04`)와 메이트(`M-02`, `M-03`)가 공용으로 사용하는 본인 인증 시연 화면과 프로필 등록 화면을 `app/(onboarding)/` 및 `src/features/onboarding/`에 추가했습니다.
+여행자(`T-03`, `T-04`)와 메이트(`M-02`, `M-03`)가 공용으로 사용하는 본인 인증 시연 화면과 프로필 등록 화면을 `app/(onboarding)/` 및 `src/features/onboarding/`에 유지했습니다.
 
 - 본인 인증 시연(`USER-02`)은 웹에서 `Blob`, 네이티브에서 `expo-file-system` 임시 캐시 파일 URI 또는 `expo-image-picker` 선택 URI를 `passportImage` multipart로 전송하고 완료 후 `USER-01`로 상태를 재확인하며 임시 파일과 여권 이미지는 보관하지 않습니다.
 - 프로필 등록(`USER-03`)은 UTF-16 기준 닉네임 2~8자 및 소개 200자 카운터와 입력 검증을 일치시켰고, 성별, 출생연도 만 18세 검증, 선택 프로필 사진 업로드(15초 제한 및 취소 제어 포함)를 지원하며 저장 후 `USER-01`을 다시 확인합니다.
 - 최신 화면 명세의 성별 `응답 안 함` 선택지는 현재 서버 `Gender` enum(`MALE`, `FEMALE`)에서 미지원 상태이므로 임의 성별로 변환하지 않고 안내 후 저장을 차단합니다.
-- 실제 `images` 버킷 업로드 정책, 배포된 Spring API 주소와 웹 CORS, 실제 기기의 사진 권한 및 카메라 동작은 아직 검증하지 않았습니다.
+- 실제 `images` 버킷 업로드 정책, 배포된 Spring API 주소와 웹 CORS, 실제 기기의 네이티브 폰트 로드와 카메라 및 사진 권한 동작은 아직 검증하지 않았습니다.

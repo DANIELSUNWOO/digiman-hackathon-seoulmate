@@ -1,3 +1,4 @@
+import { parseViews, type TagView } from "./features/tags/model";
 import { ApiError, apiRequest } from "./api";
 
 export type GenderCode = "MALE" | "FEMALE";
@@ -16,6 +17,7 @@ export type Me = {
   profileImageUrl?: string;
   bio?: string;
   verifyStatus?: VerifyStatus;
+  tags?: TagView[];
   onboarding: {
     verified: boolean;
     profile: boolean;
@@ -63,6 +65,7 @@ export function validateMe(raw: unknown, userId: string): Me {
   ) {
     throw new ApiError("INVALID_RESPONSE", "Invalid member response");
   }
+  if (value.tags !== undefined) parseViews(value.tags);
   return value as Me;
 }
 
@@ -108,6 +111,7 @@ export function nextStep(me: Me): OnboardingStep {
 export type OnboardingTargetRoute =
   | "/(onboarding)/verification"
   | "/(onboarding)/profile"
+  | "/(onboarding)/tags"
   | "/account"
   | "/(tabs)";
 
@@ -116,6 +120,7 @@ export function onboardingRouteFor(
 ): OnboardingTargetRoute {
   if (step === "verification") return "/(onboarding)/verification";
   if (step === "profile") return "/(onboarding)/profile";
+  if (step === "tags") return "/(onboarding)/tags";
   if (step === null) return "/(tabs)";
   return "/account";
 }

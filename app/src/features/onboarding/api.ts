@@ -4,9 +4,11 @@ import type { LocalProfilePhoto, UploadedProfilePhoto } from "./draftStore";
 import {
   extensionForMime,
   validateImageFile,
+  validateProfileEditForm,
   validateProfileForm,
   type ProfileFieldErrors,
   type ProfileGenderChoice,
+  type ProfileUpdatePayload,
   type SupportedImageMime,
 } from "./validation";
 
@@ -189,6 +191,25 @@ export async function submitProfile(
   return validateMe(res, userId);
 }
 
+export async function updateProfile(
+  token: string,
+  payload: ProfileUpdatePayload,
+  userId: string,
+  signal?: AbortSignal,
+): Promise<Me> {
+  const res = await apiRequest<unknown>(
+    "/users/me",
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    },
+    token,
+  );
+  return validateMe(res, userId);
+}
+
 function isUncertainFailure(error: unknown): boolean {
   return (
     error instanceof ApiError &&
@@ -248,11 +269,17 @@ export async function executeVerificationFlow(deps: {
       await deps.refreshMember();
     } catch (error) {
       if (!deps.isCurrentAccount()) return { kind: "stale" };
+      if (deps.signal?.aborted) {
+        throw new ApiError("ABORTED", "Request aborted");
+      }
       if (postError) throw postError;
       return { kind: "refresh_failed", error };
     }
 
     if (!deps.isCurrentAccount()) return { kind: "stale" };
+    if (deps.signal?.aborted) {
+      throw new ApiError("ABORTED", "Request aborted");
+    }
     const me = deps.getMe();
     if (me?.onboarding.verified) return { kind: "verified" };
     if (postError) throw postError;
@@ -432,11 +459,17 @@ export async function executeProfileSaveFlow(deps: {
     await deps.refreshMember();
   } catch (error) {
     if (!deps.isCurrentAccount()) return { kind: "stale" };
+    if (deps.signal?.aborted) {
+      throw new ApiError("ABORTED", "Request aborted");
+    }
     if (saveError) throw saveError;
     return { kind: "refresh_failed", error };
   }
 
   if (!deps.isCurrentAccount()) return { kind: "stale" };
+  if (deps.signal?.aborted) {
+    throw new ApiError("ABORTED", "Request aborted");
+  }
   const me = deps.getMe();
   if (me?.onboarding.profile) {
     deps.clearDraft();
@@ -446,5 +479,188 @@ export async function executeProfileSaveFlow(deps: {
   return {
     kind: "refresh_failed",
     error: new ApiError("INVALID_RESPONSE", "Profile state not updated"),
+  };
+}
+
+export type ExpectedProfileUpdate = {
+  nickname: string;
+  bio: string;
+  profileImageUrl: string;
+};
+
+export function matchesExpectedProfileUpdate(
+  me: Me | null,
+  expected: ExpectedProfileUpdate | null | undefined,
+): boolean {
+  if (!me || !me.onboarding.profile || !expected) return false;
+  return (
+    (me.nickname ?? "").trim() === expected.nickname &&
+    (me.bio ?? "").trim() === expected.bio &&
+    (me.profileImageUrl ?? "").trim() === expected.profileImageUrl
+  );
+}
+
+export type ProfileUpdateFlowResult =
+  | { kind: "invalid"; errors: ProfileFieldErrors }
+  | { kind: "saved"; recovered: boolean; expected: ExpectedProfileUpdate }
+  | {
+      kind: "refresh_failed";
+      error: unknown;
+      expected: ExpectedProfileUpdate;
+    }
+  | { kind: "stale" };
+
+export async function executeProfileUpdateFlow(deps: {
+  token: string;
+  userId: string;
+  apiConfigured: boolean;
+  input: {
+    nickname: string;
+    bio: string;
+    serverPhotoUrl: string | null;
+    photoRemoved: boolean;
+    localPhoto: LocalProfilePhoto | null;
+    uploadedPhoto: UploadedProfilePhoto | null;
+    uncertainUploadLocalKey?: string | null;
+  };
+  uploadPhoto: (
+    photo: LocalProfilePhoto,
+    options?: {
+      signal?: AbortSignal;
+      allowExistingOnUncertainRetry?: boolean;
+    },
+  ) => Promise<string>;
+  onPhotoUploaded?: (uploaded: UploadedProfilePhoto) => void;
+  onUploadUncertain?: (localKey: string) => void;
+  onUploadUncertainCleared?: (localKey: string) => void;
+  submit?: typeof updateProfile;
+  refreshMember: () => Promise<void>;
+  getMe: () => Me | null;
+  clearDraft: () => void;
+  isCurrentAccount: () => boolean;
+  signal?: AbortSignal;
+}): Promise<ProfileUpdateFlowResult> {
+  const existingUploadedUrl =
+    deps.input.localPhoto &&
+    deps.input.uploadedPhoto?.localKey === deps.input.localPhoto.localKey
+      ? deps.input.uploadedPhoto.publicUrl
+      : undefined;
+
+  const precheck = validateProfileEditForm({
+    nickname: deps.input.nickname,
+    bio: deps.input.bio,
+    profileImageUrl: existingUploadedUrl,
+    removePhoto: !deps.input.localPhoto && deps.input.photoRemoved,
+  });
+  if (!precheck.ok) {
+    return { kind: "invalid", errors: precheck.errors };
+  }
+
+  if (!deps.apiConfigured) {
+    throw new ApiError("CONFIG_MISSING", "API is not configured");
+  }
+  if (!deps.isCurrentAccount()) return { kind: "stale" };
+  if (deps.signal?.aborted) {
+    throw new ApiError("ABORTED", "Request aborted");
+  }
+
+  let nextPhotoUrl = existingUploadedUrl;
+  const localPhoto = deps.input.localPhoto;
+  if (localPhoto && !nextPhotoUrl) {
+    const wasAlreadyUncertain =
+      deps.input.uncertainUploadLocalKey === localPhoto.localKey;
+    deps.onUploadUncertain?.(localPhoto.localKey);
+    let publicUrl: string;
+    try {
+      publicUrl = await awaitWithAbort(
+        deps.uploadPhoto(localPhoto, {
+          signal: deps.signal,
+          allowExistingOnUncertainRetry: wasAlreadyUncertain,
+        }),
+        deps.signal,
+      );
+    } catch (error) {
+      if (!isUploadRetryUncertainError(error)) {
+        if (!wasAlreadyUncertain) {
+          deps.onUploadUncertainCleared?.(localPhoto.localKey);
+        }
+      }
+      if (!deps.isCurrentAccount()) return { kind: "stale" };
+      throw error;
+    }
+    if (!deps.isCurrentAccount()) return { kind: "stale" };
+    if (deps.signal?.aborted) {
+      throw { code: "UPLOAD_ABORTED" };
+    }
+    deps.onPhotoUploaded?.({
+      localKey: localPhoto.localKey,
+      publicUrl,
+    });
+    nextPhotoUrl = publicUrl;
+  }
+
+  const removePhoto = !localPhoto && deps.input.photoRemoved;
+  const finalCheck = validateProfileEditForm({
+    nickname: deps.input.nickname,
+    bio: deps.input.bio,
+    profileImageUrl: nextPhotoUrl,
+    removePhoto,
+  });
+  if (!finalCheck.ok) {
+    return { kind: "invalid", errors: finalCheck.errors };
+  }
+
+  const expected: ExpectedProfileUpdate = {
+    nickname: finalCheck.payload.nickname,
+    bio: finalCheck.payload.bio,
+    profileImageUrl: localPhoto
+      ? (finalCheck.payload.profileImageUrl ?? "")
+      : removePhoto
+        ? ""
+        : (deps.input.serverPhotoUrl ?? "").trim(),
+  };
+
+  const send = deps.submit ?? updateProfile;
+  let saveError: unknown = null;
+  try {
+    await send(deps.token, finalCheck.payload, deps.userId, deps.signal);
+  } catch (error) {
+    // Only uncertain network/timeout failures are verified via USER-01; never treat 409 as update success.
+    if (!isUncertainFailure(error)) {
+      throw error;
+    }
+    saveError = error;
+  }
+
+  if (!deps.isCurrentAccount()) return { kind: "stale" };
+  if (deps.signal?.aborted) {
+    throw new ApiError("ABORTED", "Request aborted");
+  }
+
+  try {
+    await deps.refreshMember();
+  } catch (error) {
+    if (!deps.isCurrentAccount()) return { kind: "stale" };
+    if (deps.signal?.aborted) {
+      throw new ApiError("ABORTED", "Request aborted");
+    }
+    if (saveError) throw saveError;
+    return { kind: "refresh_failed", error, expected };
+  }
+
+  if (!deps.isCurrentAccount()) return { kind: "stale" };
+  if (deps.signal?.aborted) {
+    throw new ApiError("ABORTED", "Request aborted");
+  }
+  const me = deps.getMe();
+  if (matchesExpectedProfileUpdate(me, expected)) {
+    deps.clearDraft();
+    return { kind: "saved", recovered: saveError !== null, expected };
+  }
+  if (saveError) throw saveError;
+  return {
+    kind: "refresh_failed",
+    error: new ApiError("INVALID_RESPONSE", "Profile update not reflected"),
+    expected,
   };
 }

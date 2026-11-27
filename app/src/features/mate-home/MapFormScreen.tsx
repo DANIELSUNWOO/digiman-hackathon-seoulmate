@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 // M-11 지도 이름·캡션: 만들기와 수정이 같은 폼을 쓴다.
 import { Label, Screen } from "../../ui";
 import { mateHomeApi, type MateHomeApi } from "./api";
@@ -14,15 +15,18 @@ export function NewMapScreen({
   api = mateHomeApi,
   onBack,
   onCreated,
+  header,
 }: {
   api?: MateHomeApi;
   onBack: () => void;
   onCreated: (mapId: number) => void;
+  header?: ReactNode;
 }) {
   const mounted = useIsMounted();
   return (
     <Screen>
       <BackButton onPress={onBack} />
+      {header}
       <Label title language="ko">
         {strings.newMapTitle}
       </Label>

@@ -1,6 +1,6 @@
 import { Redirect, useRouter } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useRef, useState, type ComponentRef } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRole } from "../src/state";
 import { useSession } from "../src/session";
 import {
@@ -36,6 +36,9 @@ export default function Email() {
   const [commonError, setCommonError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const confirmRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   if (!roleReady || !ready) return null;
   if (session && !busy && !submitting) return <Redirect href="/account" />;
@@ -48,7 +51,8 @@ export default function Email() {
   const helperFont = ko ? "NotoSansKR_400Regular" : "NotoSansJP_400Regular";
 
   async function submit() {
-    if (locked) return;
+    if (locked || submittingRef.current) return;
+    submittingRef.current = true;
     setInfoMessage("");
     setCommonError("");
     const issues = validateCredentialFields(
@@ -60,12 +64,14 @@ export default function Email() {
     );
     if (Object.keys(issues).length > 0) {
       setFieldErrors(issues);
+      submittingRef.current = false;
       return;
     }
     if (!flow) {
       setCommonError(
         ko ? "서비스 연결을 준비 중입니다." : "サービスへの接続を準備中です。",
       );
+      submittingRef.current = false;
       return;
     }
     setSubmitting(true);
@@ -95,6 +101,7 @@ export default function Email() {
     } catch (error) {
       setCommonError(errorMessage(error, ko));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
@@ -139,6 +146,9 @@ export default function Email() {
               }}
               autoCapitalize="none"
               autoCorrect={false}
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => passwordRef.current?.focus()}
               keyboardType="email-address"
               autoComplete="email"
               editable={!locked}
@@ -163,6 +173,12 @@ export default function Email() {
             <Input
               language={language}
               accessibilityLabel={ko ? "비밀번호" : "パスワード"}
+              inputRef={passwordRef}
+              returnKeyType={signup ? "next" : "done"}
+              submitBehavior={signup ? "submit" : "blurAndSubmit"}
+              onSubmitEditing={
+                signup ? () => confirmRef.current?.focus() : submit
+              }
               value={password}
               onChangeText={(value) => {
                 setPassword(value);
@@ -227,6 +243,10 @@ export default function Email() {
               <Input
                 language={language}
                 accessibilityLabel={ko ? "비밀번호 확인" : "パスワード確認"}
+                inputRef={confirmRef}
+                returnKeyType="done"
+                submitBehavior="blurAndSubmit"
+                onSubmitEditing={submit}
                 value={confirm}
                 onChangeText={(value) => {
                   setConfirm(value);

@@ -6,7 +6,12 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { CaretLeft, Info, WarningCircle } from "phosphor-react-native";
+import {
+  CaretDown,
+  CaretLeft,
+  Info,
+  WarningCircle,
+} from "phosphor-react-native";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -320,17 +325,25 @@ export function Label({
   selected?: boolean;
   tone?: "normal" | "neutral" | "desc" | "alt" | "assist" | "danger" | "brand";
   variant?:
-    "titleBig" | "body1" | "body2" | "desc" | "label" | "caption" | "status";
+    | "titleBig"
+    | "sheetTitle"
+    | "body1"
+    | "body2"
+    | "desc"
+    | "label"
+    | "caption"
+    | "status";
 }) {
   const { role } = useRole();
   const isKo = language ? language === "ko" : role === "mate";
-  const defaultWeight: FontWeightName = title
-    ? "bold"
-    : variant === "label" || variant === "status"
-      ? "semibold"
-      : variant === "body2"
-        ? "medium"
-        : "regular";
+  const defaultWeight: FontWeightName =
+    title || variant === "titleBig" || variant === "sheetTitle"
+      ? "bold"
+      : variant === "label" || variant === "status"
+        ? "semibold"
+        : variant === "body2"
+          ? "medium"
+          : "regular";
   const fontFamily = useFontFamily(weight ?? defaultWeight, language);
 
   const toneColor =
@@ -351,19 +364,21 @@ export function Label({
   const variantStyle =
     variant === "titleBig"
       ? s.title
-      : variant === "body1"
-        ? s.body1
-        : variant === "body2"
-          ? s.body2
-          : variant === "desc"
-            ? s.desc
-            : variant === "label"
-              ? s.labelText
-              : variant === "caption"
-                ? s.captionText
-                : variant === "status"
-                  ? s.statusText
-                  : undefined;
+      : variant === "sheetTitle"
+        ? s.sheetTitleText
+        : variant === "body1"
+          ? s.body1
+          : variant === "body2"
+            ? s.body2
+            : variant === "desc"
+              ? s.desc
+              : variant === "label"
+                ? s.labelText
+                : variant === "caption"
+                  ? s.captionText
+                  : variant === "status"
+                    ? s.statusText
+                    : undefined;
 
   return (
     <Text
@@ -527,8 +542,13 @@ export function Input({
   onFocus,
   onBlur,
   onContentSizeChange,
+  inputRef,
   ...props
-}: TextInputProps & { language?: "ko" | "ja"; error?: boolean }) {
+}: TextInputProps & {
+  language?: "ko" | "ja";
+  error?: boolean;
+  inputRef?: React.Ref<React.ComponentRef<typeof TextInput>>;
+}) {
   const fontFamily = useFontFamily("regular", language);
   const reducedMotion = useReducedMotion();
   const [focused, setFocused] = useState(false);
@@ -573,6 +593,7 @@ export function Input({
         ]}
       >
         <TextInput
+          ref={inputRef}
           placeholderTextColor={t.color.labelAlt}
           underlineColorAndroid="transparent"
           {...props}
@@ -607,18 +628,31 @@ export function Input({
 
 export function Chip({
   label,
+  sublabel,
   selected,
   disabled = false,
+  muted = false,
+  showChevron = false,
   language,
   onPress,
 }: {
   label: string;
+  sublabel?: string;
   selected?: boolean;
   disabled?: boolean;
+  muted?: boolean;
+  showChevron?: boolean;
   language?: "ko" | "ja";
   onPress: () => void;
 }) {
   const fontFamily = useFontFamily(selected ? "semibold" : "medium", language);
+  const subFontFamily = useFontFamily("regular", language);
+  const chevronColor = selected
+    ? t.color.surface
+    : muted || disabled
+      ? t.color.labelDisable
+      : t.color.labelNeutral;
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -627,6 +661,7 @@ export function Chip({
       onPress={onPress}
       style={[
         s.chip,
+        muted && !selected && s.chipMuted,
         selected && s.chipSelected,
         disabled && !selected && s.chipDisabled,
       ]}
@@ -635,52 +670,226 @@ export function Chip({
         style={[
           s.chipText,
           { fontFamily },
+          muted && !selected && { color: t.color.labelDisable },
           selected && { color: t.color.surface },
           disabled && !selected && { color: t.color.labelDisable },
         ]}
       >
         {label}
+        {sublabel ? (
+          <Text
+            style={[
+              s.chipSublabel,
+              { fontFamily: subFontFamily },
+              selected && { color: t.color.surface },
+              (muted || disabled) &&
+                !selected && { color: t.color.labelDisable },
+            ]}
+          >
+            {sublabel}
+          </Text>
+        ) : null}
       </Text>
+      {showChevron ? <CaretDown size={12} color={chevronColor} /> : null}
     </Pressable>
   );
 }
 
+const SHEET_ENTER_EASING = Easing.bezier(0.2, 0, 0, 1);
+const SHEET_EXIT_EASING = Easing.bezier(0.4, 0, 1, 1);
+const SHEET_DIM_OPEN_MS = t.duration.base;
+const SHEET_PANEL_OPEN_MS = t.duration.sheet;
+const SHEET_DIM_CLOSE_MS = 180;
+const SHEET_PANEL_CLOSE_MS = t.duration.base;
+
 export function BottomSheet({
   visible,
   onClose,
+  onDismissed,
   children,
 }: {
   visible: boolean;
   onClose: () => void;
+  onDismissed?: () => void;
   children: React.ReactNode;
 }) {
   const { role } = useRole();
+  const reducedMotion = useReducedMotion();
+  const [mounted, setMounted] = useState(visible);
+  const sheetHeightRef = useRef(Dimensions.get("window").height);
+  const fullyClosedRef = useRef(true);
+  const dimOpacity = useRef(new Animated.Value(0)).current;
+  const panelProgress = useRef(
+    new Animated.Value(Dimensions.get("window").height),
+  ).current;
+  const [shown, setShown] = useState(false);
+  const [measured, setMeasured] = useState(false);
+  const openingRef = useRef(false);
+  const animSeqRef = useRef(0);
+  const activeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const onDismissedRef = useRef(onDismissed);
+  onDismissedRef.current = onDismissed;
+  const useNativeDriver = Platform.OS !== "web";
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      if (!shown || !measured) return;
+      if (reducedMotion) {
+        ++animSeqRef.current;
+        activeAnimRef.current?.stop();
+        activeAnimRef.current = null;
+        openingRef.current = true;
+        fullyClosedRef.current = false;
+        dimOpacity.setValue(1);
+        panelProgress.setValue(0);
+        return;
+      }
+      if (openingRef.current) return;
+      openingRef.current = true;
+      activeAnimRef.current?.stop();
+      const seq = ++animSeqRef.current;
+      if (fullyClosedRef.current)
+        panelProgress.setValue(sheetHeightRef.current);
+      fullyClosedRef.current = false;
+      const anim = Animated.parallel([
+        Animated.timing(dimOpacity, {
+          toValue: 1,
+          duration: SHEET_DIM_OPEN_MS,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver,
+        }),
+        Animated.timing(panelProgress, {
+          toValue: 0,
+          duration: SHEET_PANEL_OPEN_MS,
+          easing: SHEET_ENTER_EASING,
+          useNativeDriver,
+        }),
+      ]);
+      activeAnimRef.current = anim;
+      anim.start(({ finished }) => {
+        if (finished && animSeqRef.current === seq)
+          activeAnimRef.current = null;
+      });
+      return;
+    }
+    if (!mounted) return;
+    openingRef.current = false;
+    activeAnimRef.current?.stop();
+    const seq = ++animSeqRef.current;
+    const complete = () => {
+      if (animSeqRef.current !== seq) return;
+      activeAnimRef.current = null;
+      fullyClosedRef.current = true;
+      setMounted(false);
+      setShown(false);
+      setMeasured(false);
+      onDismissedRef.current?.();
+    };
+    if (reducedMotion) {
+      dimOpacity.setValue(0);
+      panelProgress.setValue(sheetHeightRef.current);
+      complete();
+      return;
+    }
+    const anim = Animated.parallel([
+      Animated.timing(dimOpacity, {
+        toValue: 0,
+        duration: SHEET_DIM_CLOSE_MS,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver,
+      }),
+      Animated.timing(panelProgress, {
+        toValue: sheetHeightRef.current,
+        duration: SHEET_PANEL_CLOSE_MS,
+        easing: SHEET_EXIT_EASING,
+        useNativeDriver,
+      }),
+    ]);
+    activeAnimRef.current = anim;
+    anim.start(({ finished }) => {
+      if (finished) complete();
+    });
+  }, [
+    visible,
+    reducedMotion,
+    mounted,
+    shown,
+    measured,
+    dimOpacity,
+    panelProgress,
+    useNativeDriver,
+  ]);
+
+  useEffect(
+    () => () => {
+      ++animSeqRef.current;
+      activeAnimRef.current?.stop();
+    },
+    [],
+  );
+
+  if (!mounted) return null;
+
   return (
     <Modal
-      visible={visible}
+      visible={mounted}
       transparent
-      animationType="slide"
+      statusBarTranslucent
+      animationType="none"
+      hardwareAccelerated={Platform.OS === "android"}
       onRequestClose={onClose}
+      onShow={() => setShown(true)}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={s.overlay}
+      <View
+        style={s.modalRoot}
+        pointerEvents={visible ? "auto" : "none"}
+        accessibilityViewIsModal
       >
-        <Pressable
-          style={s.scrim}
-          accessibilityRole="button"
-          accessibilityLabel={role === "mate" ? "닫기" : "閉じる"}
-          onPress={onClose}
-        />
-        <SafeAreaView edges={["bottom"]} style={s.sheet}>
-          <View style={s.sheetHandle} />
-          <ScreenScrollContext.Provider value={null}>
-            <ScrollView keyboardShouldPersistTaps="handled">
-              {children}
-            </ScrollView>
-          </ScreenScrollContext.Provider>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
+        {/* Keep full-screen dim outside KeyboardAvoidingView and fade opacity separately from panel slide. */}
+        <Animated.View
+          style={[s.scrim, { opacity: dimOpacity }]}
+          pointerEvents={visible ? "auto" : "none"}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel={role === "mate" ? "닫기" : "閉じる"}
+            onPress={onClose}
+          />
+        </Animated.View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={s.overlay}
+          pointerEvents="box-none"
+        >
+          <Animated.View
+            onLayout={(e) => {
+              const h = Math.round(e.nativeEvent.layout.height);
+              if (h > 0) {
+                sheetHeightRef.current = Math.max(h, 240);
+                if (!measured) setMeasured(true);
+              }
+            }}
+            style={[
+              s.sheetWrap,
+              { transform: [{ translateY: panelProgress }] },
+            ]}
+          >
+            <SafeAreaView edges={["bottom"]} style={s.sheet}>
+              <View style={s.sheetHandle} />
+              <ScreenScrollContext.Provider value={null}>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {children}
+                </ScrollView>
+              </ScreenScrollContext.Provider>
+            </SafeAreaView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -936,6 +1145,11 @@ const s = StyleSheet.create({
     lineHeight: t.typography.titleBig.lineHeight,
     letterSpacing: t.typography.titleBig.letterSpacing,
   },
+  sheetTitleText: {
+    fontSize: t.typography.sheetTitle.fontSize,
+    lineHeight: t.typography.sheetTitle.lineHeight,
+    letterSpacing: -0.2,
+  },
   body1: {
     fontSize: t.typography.body1.fontSize,
     lineHeight: t.typography.body1.lineHeight,
@@ -1057,6 +1271,9 @@ const s = StyleSheet.create({
     color: t.color.labelAlt,
   },
   chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     borderWidth: 1,
     borderColor: t.color.chipLine,
     borderRadius: t.radius.pill,
@@ -1066,6 +1283,10 @@ const s = StyleSheet.create({
     minHeight: t.size.buttonSmall,
     minWidth: t.size.touchMin,
     justifyContent: "center",
+  },
+  chipMuted: {
+    borderColor: t.color.surface2,
+    backgroundColor: t.color.surface2,
   },
   chipSelected: {
     borderColor: t.color.brandDeep,
@@ -1081,6 +1302,12 @@ const s = StyleSheet.create({
     color: t.color.labelNeutral,
     textAlign: "center",
   },
+  chipSublabel: {
+    fontSize: 12,
+    lineHeight: t.typography.chip.lineHeight,
+    color: t.color.labelDesc,
+  },
+  modalRoot: { flex: 1 },
   overlay: { flex: 1, justifyContent: "flex-end" },
   scrim: {
     position: "absolute",
@@ -1090,14 +1317,19 @@ const s = StyleSheet.create({
     right: 0,
     backgroundColor: t.color.dim,
   },
-  sheet: {
+  sheetWrap: {
+    width: "100%",
     maxHeight: "85%",
+  },
+  sheet: {
+    maxHeight: "100%",
     backgroundColor: t.color.surface,
     borderTopLeftRadius: t.radius.sheet,
     borderTopRightRadius: t.radius.sheet,
     paddingHorizontal: t.space.xl,
     paddingTop: t.space.md,
     paddingBottom: t.space.xl,
+    ...t.shadow.sheet,
   },
   sheetHandle: {
     width: 36,

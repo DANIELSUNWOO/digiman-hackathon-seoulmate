@@ -21,6 +21,7 @@ export type ProfileDraft = {
   localPhoto: LocalProfilePhoto | null;
   uploadedPhoto: UploadedProfilePhoto | null;
   uncertainUploadLocalKey: string | null;
+  photoRemoved?: boolean;
 };
 
 const EMPTY_DRAFT: ProfileDraft = {
@@ -31,11 +32,16 @@ const EMPTY_DRAFT: ProfileDraft = {
   localPhoto: null,
   uploadedPhoto: null,
   uncertainUploadLocalKey: null,
+  photoRemoved: false,
 };
 
 // Keep profile drafts strictly in memory per account; never persist raw images across sign-outs.
 const drafts = new Map<string, ProfileDraft>();
 let activeAccountId: string | null = null;
+
+export function hasProfileDraft(userId: string): boolean {
+  return drafts.has(userId);
+}
 
 export function getProfileDraft(userId: string): ProfileDraft {
   const existing = drafts.get(userId);

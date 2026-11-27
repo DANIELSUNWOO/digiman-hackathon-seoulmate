@@ -24,6 +24,12 @@ export type ProfilePayload = {
   bio?: string;
 };
 
+export type ProfileUpdatePayload = {
+  nickname: string;
+  profileImageUrl?: string;
+  bio: string;
+};
+
 export type NicknameIssue =
   "NICKNAME_REQUIRED" | "NICKNAME_TOO_SHORT" | "NICKNAME_TOO_LONG";
 
@@ -132,6 +138,46 @@ export function validateProfileForm(
     birthYear: Number(input.birthYear.trim()),
     ...(cleanUrl ? { profileImageUrl: cleanUrl } : {}),
     ...(trimmedBio ? { bio: trimmedBio } : {}),
+  };
+  return { ok: true, payload };
+}
+
+export function validateProfileEditForm(input: {
+  nickname: string;
+  bio: string;
+  profileImageUrl?: string;
+  removePhoto?: boolean;
+}):
+  | { ok: true; payload: ProfileUpdatePayload }
+  | { ok: false; errors: ProfileFieldErrors } {
+  const errors: ProfileFieldErrors = {};
+  const nicknameIssue = validateNickname(input.nickname);
+  if (nicknameIssue) errors.nickname = nicknameIssue;
+
+  const bioIssue = validateBio(input.bio);
+  if (bioIssue) errors.bio = bioIssue;
+
+  const cleanUrl = input.profileImageUrl?.trim();
+  if (
+    !input.removePhoto &&
+    cleanUrl &&
+    cleanUrl.length > PROFILE_IMAGE_URL_MAX
+  ) {
+    errors.profileImageUrl = "PROFILE_IMAGE_URL_TOO_LONG";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { ok: false, errors };
+  }
+
+  const payload: ProfileUpdatePayload = {
+    nickname: input.nickname.trim(),
+    bio: input.bio.trim(),
+    ...(input.removePhoto
+      ? { profileImageUrl: "" }
+      : cleanUrl
+        ? { profileImageUrl: cleanUrl }
+        : {}),
   };
   return { ok: true, payload };
 }

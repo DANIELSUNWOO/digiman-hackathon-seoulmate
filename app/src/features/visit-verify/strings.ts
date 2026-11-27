@@ -1,0 +1,30 @@
+// 여행자 화면이라 일본어만 둔다. 화면 문구는 디자인 프로토타입(T-23)을 따르고,
+// 거기 없는 문구는 검수 전이다.
+export const strings = {
+  title: "訪問を認証",
+  back: "戻る",
+  subtitle: "写真とひとことで認証します",
+  loading: "読み込み中",
+  retry: "再試行",
+  addPhoto: "写真を追加",
+  takePhoto: "カメラで撮る",
+  choosePhoto: "アルバムから選ぶ",
+  photoSelected: "選んだ写真",
+  photoPreparing: "写真を準備しています…",
+  photoFailed: "写真を読み込めませんでした。もう一度お試しください",
+  cameraDenied:
+    "カメラの使用が許可されていません。設定で許可するか、アルバムから選んでください",
+  openSettings: "設定を開く",
+  reviewLabel: "レビュー",
+  reviewPlaceholder: "どんな場所でしたか？",
+  locationNotice:
+    "アップロードの瞬間に1回だけ、スポットから200m以内か確認します。位置情報はメイトに共有されません。",
+  submit: "アップロードして認証",
+  spotMissing: "このコースにないスポットです",
+  alreadyVisited: "このスポットは認証済みです",
+  errorLoad: "スポットを読み込めませんでした",
+  errorNetwork: "ネットワーク接続を確認してください",
+  errorSession: "もう一度ログインしてください",
+  errorForbidden: "このマッチのスポットは表示できません",
+  errorNotOnCourse: "この旅行はすでに終了しています",
+};

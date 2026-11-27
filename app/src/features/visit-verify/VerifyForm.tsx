@@ -4,26 +4,34 @@ import { theme } from "../../theme";
 import { Button, Input, Label, Notice, ScreenFooter } from "../../ui";
 import { PhotoField } from "./PhotoField";
 import { strings } from "./strings";
-import type { PickPhoto, VisitDraft } from "./types";
+import type { PickPhoto, ReadPosition, SubmitVisit } from "./types";
 import { usePhoto } from "./usePhoto";
+import { useVerification } from "./useVerification";
+import { VerifySheet } from "./VerifySheet";
 
 // 서버 VisitService.VisitRequest의 제한
 const REVIEW_MAX = 500;
 
 export interface VerifyFormProps {
   pickPhoto: PickPhoto;
-  onSubmit: (draft: VisitDraft) => void;
+  readPosition: ReadPosition;
+  submit: SubmitVisit;
 }
 
 /** 사진과 후기가 모두 있어야 제출할 수 있다. */
 export function VerifyForm({
   pickPhoto,
-  onSubmit,
+  readPosition,
+  submit,
 }: VerifyFormProps): ReactElement {
   const picking = usePhoto(pickPhoto);
+  const flow = useVerification(readPosition, submit);
   const [review, setReview] = useState("");
   const { photo, preparing } = picking;
   const content = review.trim();
+  const start = (): void => {
+    if (photo) void flow.start({ photo, review: content });
+  };
 
   return (
     <>
@@ -61,11 +69,10 @@ export function VerifyForm({
           label={strings.submit}
           language="ja"
           disabled={photo === null || preparing || content === ""}
-          onPress={() => {
-            if (photo) onSubmit({ photo, review: content });
-          }}
+          onPress={start}
         />
       </ScreenFooter>
+      <VerifySheet state={flow.state} onRetry={start} onClose={flow.close} />
     </>
   );
 }

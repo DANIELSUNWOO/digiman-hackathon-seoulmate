@@ -31,7 +31,7 @@ export default function VisitVerify(): ReactElement | null {
       onBack={() =>
         router.canGoBack() ? router.back() : router.replace("/(tabs)")
       }
-      onSubmit={() => {}}
+      submit={async () => {}}
     />
   );
 }

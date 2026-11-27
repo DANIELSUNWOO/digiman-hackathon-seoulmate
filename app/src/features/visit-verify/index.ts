@@ -2,4 +2,4 @@ export {
   VisitVerifyScreen,
   type VisitVerifyScreenProps,
 } from "./VisitVerifyScreen";
-export type { VisitDraft } from "./types";
+export type { SubmitVisit } from "./types";

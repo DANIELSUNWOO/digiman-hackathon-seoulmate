@@ -19,6 +19,26 @@ export type PickResult =
 
 export type PickPhoto = (source: PhotoSource) => Promise<PickResult>;
 
+/** 제출 순간의 위치. 저장하거나 로그에 남기지 않는다. */
+export interface Position {
+  lat: number;
+  lng: number;
+  /** 오차 반경(m). 알 수 없으면 null */
+  accuracy: number | null;
+}
+
+export type LocationProblem = "denied" | "off" | "unavailable";
+
+export type LocationResult =
+  { status: "ok"; position: Position } | { status: LocationProblem };
+
+export type ReadPosition = () => Promise<LocationResult>;
+
+export type SubmitVisit = (
+  draft: VisitDraft,
+  position: Position,
+) => Promise<void>;
+
 export interface VisitDraft {
   photo: PickedPhoto;
   review: string;

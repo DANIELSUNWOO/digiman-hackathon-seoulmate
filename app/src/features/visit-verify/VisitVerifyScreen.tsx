@@ -10,28 +10,31 @@ import { theme } from "../../theme";
 import { AppBar, Button, ErrorNotice, Label, Notice, Screen } from "../../ui";
 import { visitVerifyApi, type VisitVerifyApi } from "./api";
 import { errorText } from "./errors";
+import { readPosition as readFromDevice } from "./location";
 import { pickPhoto as pickFromDevice } from "./photo";
 import { strings } from "./strings";
-import type { CourseSpot, PickPhoto, VisitDraft } from "./types";
+import type { CourseSpot, PickPhoto, ReadPosition, SubmitVisit } from "./types";
 import { useSpot, type SpotLoad } from "./useSpot";
 import { VerifyForm } from "./VerifyForm";
 
 export interface VisitVerifyScreenProps {
   api?: VisitVerifyApi;
   pickPhoto?: PickPhoto;
+  readPosition?: ReadPosition;
   matchId: number;
   spotId: number;
   onBack: () => void;
-  onSubmit: (draft: VisitDraft) => void;
+  submit: SubmitVisit;
 }
 
 export function VisitVerifyScreen({
   api = visitVerifyApi,
   pickPhoto = pickFromDevice,
+  readPosition = readFromDevice,
   matchId,
   spotId,
   onBack,
-  onSubmit,
+  submit,
 }: VisitVerifyScreenProps): ReactElement {
   const load = useSpot(api, matchId, spotId);
 
@@ -48,7 +51,12 @@ export function VisitVerifyScreen({
           backLabel={strings.back}
           onBack={onBack}
         />
-        <SpotBody load={load} pickPhoto={pickPhoto} onSubmit={onSubmit} />
+        <SpotBody
+          load={load}
+          pickPhoto={pickPhoto}
+          readPosition={readPosition}
+          submit={submit}
+        />
       </Screen>
     </KeyboardAvoidingView>
   );
@@ -57,7 +65,8 @@ export function VisitVerifyScreen({
 interface SpotBodyProps {
   load: SpotLoad;
   pickPhoto: PickPhoto;
-  onSubmit: (draft: VisitDraft) => void;
+  readPosition: ReadPosition;
+  submit: SubmitVisit;
 }
 
 function SpotBody({ load, ...form }: SpotBodyProps): ReactElement {

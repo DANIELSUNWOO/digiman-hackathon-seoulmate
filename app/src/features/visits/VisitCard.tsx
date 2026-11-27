@@ -64,10 +64,9 @@ export function VisitCard({
   );
 }
 
-function VisitPhoto({
-  visit,
-  lang,
-}: Pick<VisitCardProps, "visit" | "lang">): ReactElement {
+export type VisitPhotoProps = Pick<VisitCardProps, "visit" | "lang">;
+
+export function VisitPhoto({ visit, lang }: VisitPhotoProps): ReactElement {
   const [failed, setFailed] = useState(false);
   const text = strings[lang];
   if (failed)

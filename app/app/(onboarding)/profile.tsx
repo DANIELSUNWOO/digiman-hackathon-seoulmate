@@ -1,15 +1,7 @@
 import { Redirect, useRouter } from "expo-router";
 import { Camera, CaretLeft, User } from "phosphor-react-native";
 import { useEffect, useRef, useState } from "react";
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { executeProfileSaveFlow } from "../../src/features/onboarding/api";
 import {
   clearProfileDraft,
@@ -350,10 +342,7 @@ export default function ProfileScreen() {
 
   return (
     <Screen contentStyle={styles.content}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboard}
-      >
+      <View style={styles.body}>
         {ko ? (
           <AppBar
             title={copy.headerTitle}
@@ -650,7 +639,7 @@ export default function ProfileScreen() {
             />
           )}
         </ScreenFooter>
-      </KeyboardAvoidingView>
+      </View>
     </Screen>
   );
 }
@@ -659,8 +648,8 @@ const styles = StyleSheet.create({
   content: {
     gap: 0,
   },
-  keyboard: {
-    flex: 1,
+  body: {
+    flexGrow: 1,
     gap: theme.space.lg,
   },
   onboardingTop: {

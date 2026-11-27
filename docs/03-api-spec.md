@@ -1,6 +1,7 @@
-# 서울메이트 API 명세서 v1.8 (11/27)
+# 서울메이트 API 명세서 v1.9 (11/27)
 
 > 기준 문서: 요구사항정의서 v3.5, ERD v2.6, **디자인 개발 전달 패키지 v4 (화면 명세 74화면 · 프로토타입 v9 블루 · 시연 플로우, 11/26)**. 요구사항정의서와 다르면 화면 명세를 따른다
+> v1.9 변경: 디자이너 최종본(11/26) 서버 반영 시작. 취향 목록을 최종 디자인으로 교체(V4: 분류 11개, TAG-01), 지도 고르기에 동네 필터(MAP-07 `areaTagId`·`area`·`areas`)와 추천순에서 동네 제외, 받은 후기 모음 REVIEW-03 추가(C-02a), 상호 후기 번역(V5, REVIEW-02). TAG-01 3단계 트리, TAG-02 개수 제한 해제 · 세부 저장 · 여행자 동네 저장, 메이트는 회원 등록 때 바로 인증 완료(AUTH-01, V6). 6장 12~21번에 반영 상태 표시
 > v1.8 변경: 디자이너 최종본 반영. API 동작은 바뀌지 않았다. 3장에 새 화면(T-05b, T-12a, T-29, T-30a, C-07, C-02a, M-00, M-04b) 매핑 추가, 4장에 시연 방식(프로토타입 + 실제 앱) 추가, 6장에 11/26 2차 디자인 변경과 서버 영향(12~20번, 결선 범위 결정 대기) 추가. 문서 안에서 서로 다르던 곳 정리: 0-4 닉네임 예시(2~8자), MATCH-08 에러 설명, BLOCK-01 사유 목록·문장, 장소 검색(SPOT-01, 6장 5번). TAG-01 · TAG-02 · USER-01 응답에 `category` 추가, 취향 전체 최대 14개 (서버 A `feature/sa-tag-category`)
 > v1.7 변경: 화면 명세 v9 반영. **지도 카드를 고르면 바로 매칭 + 코스 확정**(MATE-01·MATCH-04·MATCH-05 삭제, 지도 고르기 MAP-07·공개 스팟 미리보기 MAP-08 추가, MATCH-01은 mapId로), 채팅은 50% 달성 후 여행자가 바로 열기(CHAT-01), 필요 인증 수는 **내림**, 메이트도 매칭 끊기(MATCH-07), 리액션 3종 토글과 댓글 분리(VISIT-03~05), 스팟 사진 최대 3장, 지도 수정 잠금, 닉네임 8자, 취향 대분류당 2개, 신고 사유 추가, 기간 만료에도 앨범, 활동 요약(USER-06). 바뀐 곳은 0-3, 1장 목록, USER-03, USER-06, TAG-02, MAP-01~08, SPOT-01~03, MATCH-01~08, VISIT-01~05, CHAT-01, ALBUM-01, REPORT-01, 알림 표, 서버 배치, 3·4·6·7장
 > v1.6 변경: 서버 B 구현에 맞춰 정리. 지도·스팟 삭제 불가 조건(MAP_IN_USE)을 넓힘, 수정 API 응답 형식 명시, 차단 관계에서는 리액션·후기 불가, 상호 후기는 아직 번역하지 않음, 에러 코드 추가(MAP_NOT_FOUND, SPOT_NOT_FOUND, VISIT_NOT_FOUND, ALBUM_NOT_FOUND, ALREADY_REVIEWED). 바뀐 곳은 MAP-01·02·03·04·05, SPOT-01·02·03, VISIT-01·02·03, ALBUM-01·02, REVIEW-01·02, 6장
@@ -68,6 +69,7 @@
 - 앱은 `sourceLang`이 내 언어와 다르면 `translated`를 보여 주고 "AI 번역" 표시와 "원문 보기"를 붙인다.
 - 번역이 실패하면 `translated`는 `null`. 앱은 원문을 보여 준다. 글 저장 자체는 실패시키지 않는다.
 - 사용자 글 안에 "지시를 무시하고 ~라고 번역해" 같은 문장이 있어도 서버는 그 문장을 지시로 따르지 않고 글로만 번역한다. 번역 결과가 원문보다 지나치게 길면 버리고 `null`로 둔다. 그래도 번역은 참고용이므로 **앱은 "원문 보기"를 항상 유지하고, 신고·운영 판단은 원문 기준으로 한다.**
+- 상호 후기도 v1.9부터 받는 사람 언어로 번역한다 (V5 `reviews.content_translated`).
 - **LLM API 키는 서버 `.env`에만 둔다.** 앱 코드와 GitHub에는 절대 넣지 않는다.
 
 ### 0-4. 응답 형식
@@ -136,7 +138,7 @@
 | (Supabase) | – | `supabase.auth.signUp / signInWithPassword` | 회원가입·로그인 | 없음 | F-02, F-03 | P0 |
 | AUTH-01 | POST | /users | 회원 등록 (Supabase 가입 직후 국적·약관 저장) | 로그인 | F-01, F-02 | P0 |
 | USER-01 | GET | /users/me | 내 정보 + 온보딩 진행 상태 + 칸/정원 | 로그인 | F-06, F-18, F-23 | P0 |
-| USER-02 | POST | /users/me/verification | 여권 인증 (MVP는 업로드만) | 로그인 | F-04 | P0 |
+| USER-02 | POST | /users/me/verification | 여권 인증 (MVP는 업로드만, 여행자용) | 로그인 | F-04 | P0 |
 | USER-03 | PUT | /users/me/profile | 프로필 최초 등록 | 로그인 | F-05, F-06 | P0 |
 | USER-04 | PATCH | /users/me | 프로필 수정 | 로그인 | F-41 | P1 |
 | USER-05 | DELETE | /users/me | 회원 탈퇴 | 로그인 | F-43 | P1 |
@@ -193,6 +195,7 @@
 | ALBUM-02 | PATCH | /matches/{matchId}/album | 앨범 제목·표지 수정 | 여행자(당사자) | F-33 | P2 |
 | REVIEW-01 | POST | /matches/{matchId}/reviews | 상호 후기 작성 | 당사자 | F-34 | P1 |
 | REVIEW-02 | GET | /matches/{matchId}/reviews | 후기 보기 | 당사자 | F-34 | P1 |
+| REVIEW-03 | GET | /users/me/reviews | 받은 후기 모음 (평균 · 분포 · 목록) | 로그인 | C-02a | P1 |
 
 ### 안전 · 알림
 
@@ -247,6 +250,7 @@ Supabase 가입 직후 한 번 호출해서 서비스용 회원(USERS)을 만든
 ```
 
 - `country`가 `JP`면 role = TRAVELER, language = ja. `KR`이면 MATE, ko.
+- **메이트는 등록하자마자 `verify_status = VERIFIED`** (v1.9, 디자인 M-02: 휴대폰 본인인증이라 여권 단계가 없다). 앱은 USER-01의 `onboarding.verified = true`를 보고 본인 인증 단계를 건너뛴다. 실제 문자 인증은 Supabase Phone 로그인 몫이고, 결선 버전에서는 서버가 따로 확인하지 않는다. 여행자는 그대로 USER-02 전까지 `NONE`.
 - USERS.id = 토큰의 sub. 약관 동의 시각을 `terms_agreed_at`에 저장한다.
 
 | 상태 | 코드 | 상황 |
@@ -298,6 +302,7 @@ Supabase 가입 직후 한 번 호출해서 서비스용 회원(USERS)을 만든
 { "verifyStatus": "VERIFIED" }
 ```
 
+- 여행자용이다. 메이트는 AUTH-01 때 이미 인증 완료라 부를 필요가 없다 (불러도 결과는 같다).
 - **MVP는 사진을 받기만 하고 저장하지 않는다.** 실제 검증을 하지 않는데 여권 사진을 보관하면 개인정보 위험만 생기기 때문이다. 받은 뒤 바로 `verify_status = VERIFIED`로 바꾼다.
 
 #### USER-03 프로필 최초 등록
@@ -351,37 +356,48 @@ Supabase 가입 직후 한 번 호출해서 서비스용 회원(USERS)을 만든
 ```json
 // 응답 200 (메이트가 요청한 경우 한국어)
 [
-  { "tagId": 1, "category": "FOOD", "name": "카페·맛집", "children": [
-      { "tagId": 8, "name": "카페" },
-      { "tagId": 9, "name": "로컬 식당" }
+  { "tagId": 2, "category": "FOOD", "name": "맛집", "children": [
+      { "tagId": 20, "name": "로컬 식당", "children": [
+          { "tagId": 30, "name": "노포" }, { "tagId": 31, "name": "혼밥 가능" }, ...
+      ]}, ...
   ]},
-  { "tagId": 2, "category": "WALK", "name": "동네 산책", "children": [ ... ] },
-  { "tagId": 7, "category": "AREA", "name": "동네", "children": [
-      { "tagId": 32, "name": "성수" }, ...
+  { "tagId": 7, "category": "OSHI_KPOP", "name": "K-POP", "children": [
+      { "tagId": 50, "name": "BTS", "children": [ { "tagId": 90, "name": "지민" }, ... ] }, ...
+  ]},
+  { "tagId": 11, "category": "AREA", "name": "동네", "children": [
+      { "tagId": 70, "name": "성수", "children": [] }, ...
   ]}
 ]
 ```
 
-- 취향 목록은 DB에 미리 넣어 두는 고정 데이터다 (V3 마이그레이션, 화면 명세 v9 T-05·M-04 기준).
-  - 분류 7개: 카페·맛집 / 동네 산책 / 문화 / 쇼핑 / 스포츠 / 웰니스 / 동네(AREA). 항목 30개
-  - `category`: 분류 코드 `FOOD` / `WALK` / `CULTURE` / `SHOP` / `SPORTS` / `WELLNESS` / `AREA`. 이름은 언어마다 다르니 앱은 이 코드로 분류를 구분한다
-  - **동네(AREA)는 메이트의 "잘 아는 동네"(M-04)용**이다. 여행자 취향 설문(T-05)에서는 앱이 `category == "AREA"`인 분류를 숨긴다
-  - T-05a 세부 선택(3단계)은 결선 버전에서 넣지 않는다
+- 취향 목록은 DB에 미리 넣어 두는 고정 데이터다. **v1.9부터 V4 마이그레이션(디자인 최종본 11/26 기준)** 으로 바뀌었다. tagId는 V3와 달라졌으니 앱은 tagId를 코드에 적지 말고 TAG-01에서 받는다.
+  - 분류 11개, 항목(2단계) 63개, 세부(3단계) 87개
+  - `category`: `CAFE` 카페 / `FOOD` 맛집 / `BEAUTY` 뷰티 / `SHOP` 쇼핑 / `WALK` 동네 산책 / `CULTURE` 문화·체험 / `OSHI_KPOP` K-POP / `OSHI_DRAMA` 드라마·배우 / `OSHI_ANIME` 일본 애니·J-POP / `OSHI_BASEBALL` 야구 / `AREA` 동네
+  - `OSHI_`로 시작하는 4개가 推し · 최애 시트(T-05b · M-04b)다. 그룹 → 멤버(예: BTS → 지민)는 3단계
+  - `AREA`(성수 · 연남 · 을지로 · 망원 · 익선 · 한남)는 메이트의 "잘 아는 동네"(M-04)와 여행자의 「行ってみたい街」(T-05, v1.9부터 여행자도 저장 가능). **추천 점수에는 들어가지 않고 동점일 때만 쓴다** (MAP-07)
+- 응답은 **분류 → 항목 → 세부 3단계**다. 세부가 없는 항목은 `children = []`. 세부 선택 시트(T-05a)와 推し 멤버는 항목의 `children`을 쓴다.
+- 3단계 세부 이름 중 일부 일본어(노포 · 혼밥 가능 · 빙수 · 올리브영 등)는 서버 B가 옮긴 것이라 디자이너 확인이 필요하다
 
 #### TAG-02 내 취향 저장
 `PUT /users/me/tags` · 로그인 · F-07, F-41
 
 ```json
-// 요청: 기존 선택을 통째로 이 목록으로 바꾼다
-{ "tagIds": [8, 9, 32] }
+// 요청: 기존 선택을 통째로 이 목록으로 바꾼다 (항목과 세부를 섞어도 된다)
+{ "tagIds": [20, 30, 90, 70] }
 // 응답 200
-{ "tags": [ { "tagId": 8, "category": "FOOD", "name": "카페", "parentId": 1 }, ... ] }
+{ "tags": [ { "tagId": 20, "category": "FOOD", "name": "로컬 식당", "parentId": 2, "depth": 2 },
+            { "tagId": 30, "category": "FOOD", "name": "노포", "parentId": 20, "depth": 3 }, ... ] }
 ```
+
+- **개수 제한 없음** (v1.9, 디자인 T-05). 1개 이상이면 된다. 같은 tagId를 두 번 보내면 한 번으로 친다.
+- 2단계 항목과 3단계 세부(推し 멤버 포함)를 모두 고를 수 있다. 세부만 골라도 되고, 항목과 그 아래 세부를 같이 골라도 된다.
+- 추천순(MAP-07)은 세부를 그 위 항목으로 묶어서 센다. 동네(AREA)는 점수에 넣지 않는다.
+- USER-01의 `tags`도 같은 형식(`depth` 포함)이다.
 
 | 상태 | 코드 | 상황 |
 | --- | --- | --- |
-| 400 | TAG_COUNT_INVALID | 0개, 15개 이상, 또는 한 분류에서 3개 이상 (분류당 최대 2개, 전체 최대 14개 = 6분류 × 2 + 동네 2) |
-| 400 | INVALID_TAG | 없는 태그, 또는 대분류(depth 1) 태그 (세부 취향만 선택) |
+| 400 | TAG_COUNT_INVALID | 0개 (요청 크기 보호용 상한 150개 초과 포함) |
+| 400 | INVALID_TAG | 없는 태그, 또는 분류(depth 1) 태그 |
 
 #### PREF-01 / PREF-02 매칭 조건
 `GET /users/me/match-preferences`, `PUT /users/me/match-preferences` · 여행자 · F-08
@@ -611,7 +627,7 @@ const { data } = supabase.storage.from('images').getPublicUrl(path)  // data.pub
 ### 매칭
 
 #### MAP-07 지도 고르기
-`GET /maps?sort=PINS_DESC&minPins=5&maxPins=12&page=0&size=20` · 여행자, 인증 필요 · T-11, T-11c, T-11d, T-18
+`GET /maps?sort=PINS_DESC&minPins=5&maxPins=12&areaTagId=70&page=0&size=20` · 여행자, 인증 필요 · T-11, T-11c, T-11d, T-18
 
 카드 1장 = 지도 1개다. 카드를 누르면 공개 스팟 미리보기(MAP-08)로 가고, 거기서 고르면 바로 매칭된다(MATCH-01).
 
@@ -620,6 +636,7 @@ const { data } = supabase.storage.from('images').getPublicUrl(path)  // data.pub
 | sort | 생략 = 추천순 / `PINS_ASC`(핀 적은 순) / `PINS_DESC`(핀 많은 순) / `RECENT`(최근 업데이트 순) / `POPULAR`(인기순) | 추천순 |
 | minPins | 핀 개수 필터 최솟값 (5 이상) | 5 |
 | maxPins | 핀 개수 필터 최댓값. **생략하면 상한 없음** (슬라이더를 "20+" 끝에 두면 앱이 보내지 않는다) | 없음 |
+| areaTagId | 미니 지도에서 누른 동네 (TAG-01의 `AREA` 항목 tagId). 그 동네 지도만 (v1.9) | 없음 = 모든 동네 |
 | page, size | 0부터 시작하는 페이지, 한 번에 20개 (size 1~50) | 0, 20 |
 
 ```json
@@ -633,9 +650,11 @@ const { data } = supabase.storage.from('images').getPublicUrl(path)  // data.pub
       "pinCount": 7,
       "lastUpdatedAt": "2026-11-24T18:20:00+09:00",
       "selectedCount": 24,
-      "myMatchId": null
+      "myMatchId": null,
+      "area": { "tagId": 70, "name": "聖水" }
     }
   ],
+  "areas": [ { "tagId": 70, "name": "聖水", "mapCount": 3 }, { "tagId": 71, "name": "延南洞", "mapCount": 2 } ],
   "totalCount": 12,
   "emptyReason": null,
   "page": 0,
@@ -652,15 +671,17 @@ const { data } = supabase.storage.from('images').getPublicUrl(path)  // data.pub
 | 핀 개수 필터 | pinCount가 minPins~maxPins 안 |
 | lastUpdatedAt | 지도의 updated_at |
 | selectedCount | 이 지도가 코스로 선택된 누적 횟수 (카드의 "♥ 24人が選択") |
+| area (v1.9) | 지도의 동네. 스팟 좌표 평균에서 가장 가까운 동네 중심(성수 · 연남 · 을지로 · 망원 · 익선 · 한남)이 3km 안이면 그 동네, 아니면 `null` |
+| areas (v1.9) | 미니 지도에 그릴 동네별 지도 수. 핀 개수 필터까지 적용하고 **동네 필터는 적용하기 전** 숫자라, 동네를 눌러도 다른 동네 숫자가 사라지지 않는다. 동네 6곳이 항상 TAG-01 순서로 들어가고, 지도가 없으면 `mapCount = 0` |
 | totalCount | 필터를 적용한 전체 지도 수. 핀 개수 시트(T-11c)에서 범위를 바꿀 때 `size=1`로 불러 이 값만 버튼에 써도 된다 |
 
-- 추천순 = 여행자와 메이트가 겹치는 취향 수가 많은 순. 정렬 값이 같으면 겹치는 취향 수 → 최근 업데이트 → mapId 순으로 정한다 (다음 페이지에서 중복·누락이 없도록).
+- 추천순 = 여행자와 메이트가 겹치는 취향 수가 많은 순. **동네(AREA)는 세지 않고**, 3단계 세부는 그 위 2단계 항목으로 묶어서 센다 (예: 여행자 "노포" + 메이트 "로컬 식당" = 1개 겹침). 정렬 값이 같으면 겹치는 취향 수 → 여행자가 고른 동네의 지도인지 → 최근 업데이트 → mapId 순으로 정한다 (다음 페이지에서 중복·누락이 없도록).
 - `emptyReason` (items가 비었을 때만): `NO_MATE` = 매칭 조건에 맞는 메이트가 0명 → T-18 / `NO_MAP_IN_RANGE` = 메이트는 있지만 핀 개수 범위에 맞는 지도가 0개 → T-11 빈 화면 ("条件をリセット").
 - 숨긴 스팟의 이름·위치는 넣지 않는다 (F-16).
 
 | 상태 | 코드 | 상황 |
 | --- | --- | --- |
-| 400 | VALIDATION_ERROR | sort 값 오류, minPins < 5, minPins > maxPins, page < 0, size가 1~50 밖 |
+| 400 | VALIDATION_ERROR | sort 값 오류, minPins < 5, minPins > maxPins, page < 0, size가 1~50 밖, areaTagId가 AREA 태그가 아님 |
 | 403 | NOT_VERIFIED | 여권 인증 전 |
 | 409 | TRIP_REQUIRED | 진행 중인 여행 일정이 없음 |
 | 409 | PREFERENCES_REQUIRED | 매칭 조건을 아직 저장하지 않음 |
@@ -1028,12 +1049,12 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 { "reviewId": 12 }
 // GET 응답 200 (작성 순)
 [ { "reviewId": 12, "reviewer": { UserSummary }, "rating": 5,
-    "content": { "original": "おかげで最高の旅になりました", "translated": null, "sourceLang": "ja" },
+    "content": { "original": "おかげで最高の旅になりました", "translated": "덕분에 최고의 여행이 됐어요", "sourceLang": "ja" },
     "createdAt": "..." } ]
 ```
 
 - 여행 완료(COMPLETED)와 기간 만료(EXPIRED, T-91 → 앨범 → 후기) 뒤에 쓸 수 있다.
-- **후기는 아직 번역하지 않는다.** `reviews` 테이블에 번역 칸이 없어서 `translated`는 항상 `null`이다 (6장 7번). 앱은 원문을 보여 준다.
+- 후기 글은 저장한 뒤 받는 사람 언어로 번역한다 (v1.9, V5). 번역이 끝나기 전이나 실패하면 `translated`는 `null` (0-3).
 - content를 생략하면 `content`는 `null`.
 
 | 상태 | 코드 | 상황 |
@@ -1043,6 +1064,33 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 | 409 | MATCH_NOT_COMPLETED | 여행이 끝나지 않음 (완료·기간 만료가 아님. 취소·차단된 매칭 포함) |
 | 409 | MATCH_NOT_ACTIVE | 여행 완료 뒤 어느 한쪽이 차단함 |
 | 409 | ALREADY_REVIEWED | 이미 작성함 |
+
+#### REVIEW-03 받은 후기 모음
+`GET /users/me/reviews` · 로그인 (여행자 · 메이트 공통) · C-02a
+
+마이페이지 별점 버튼에서 연다. 위쪽에 평균 별점과 별 개수별 분포, 아래에 받은 후기 목록(최근 순).
+
+```json
+// 응답 200
+{
+  "average": 4.8,
+  "count": 5,
+  "distribution": [ { "rating": 5, "count": 4 }, { "rating": 4, "count": 1 }, { "rating": 3, "count": 0 },
+                    { "rating": 2, "count": 0 }, { "rating": 1, "count": 0 } ],
+  "items": [
+    { "reviewId": 31, "matchId": 12, "reviewer": { UserSummary }, "rating": 5,
+      "content": { "original": "ガイドブックにないソウルを楽しめました。", "translated": "가이드북에 없는 서울을 즐길 수 있었어요.", "sourceLang": "ja" },
+      "map": { "mapId": 5, "title": { "original": "성수 골목 산책", "translated": "聖水の路地さんぽ", "sourceLang": "ko" } },
+      "createdAt": "2026-11-20T18:00:00+09:00" }
+  ]
+}
+```
+
+- `average`는 소수 첫째 자리(반올림). 받은 후기가 없으면 `average = null`, `count = 0`, 분포는 다섯 칸 모두 0, `items = []`.
+- `distribution`은 5점 → 1점 순서로 항상 다섯 칸.
+- 별점만 남긴 후기는 `content = null`. `map`은 그 여행의 코스 지도 (지도가 없으면 `null`).
+- **지금 차단 관계인 상대의 후기는 목록과 평균 · 분포에서 모두 뺀다.**
+- 페이지 없이 한 번에 내려준다 (결선 시연 규모 기준).
 
 ---
 
@@ -1177,11 +1225,11 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 | T-02 가입·로그인 | – | Supabase 가입·로그인 → AUTH-01(가입 직후 1회) → USER-01 |
 | T-03 여권 인증 | – | USER-02 |
 | T-04 프로필 등록 | – | UPLOAD-01 → USER-03 |
-| T-05 / T-05a / T-05b 여행 취향 · 推し | TAG-01 | TAG-02 (推し와 「行ってみたい街」는 지금 서버에 저장할 곳이 없다. 6장 13 · 14번) |
+| T-05 / T-05a / T-05b 여행 취향 · 推し | TAG-01 (推し = `OSHI_` 분류, 세부 = 항목의 `children`, 「行ってみたい街」 = `AREA`) | TAG-02 |
 | T-06 매칭 조건 | PREF-01 | PREF-02 |
 | T-07 여행 일정 | TRIP-02 | TRIP-01 / TRIP-03 |
 | T-10 홈 · 여행 전 | USER-01, MATCH-02(active), NOTI-02 | – |
-| T-11 / T-11c / T-11d 지도 고르기 | MAP-07 (정렬·필터를 바꿀 때, 아래로 스크롤할 때 다시 호출) | – (위쪽 미니 지도 동네 필터는 6장 15번) |
+| T-11 / T-11c / T-11d 지도 고르기 | MAP-07 (정렬·필터를 바꿀 때, 아래로 스크롤할 때 다시 호출. 미니 지도는 응답의 `areas`) | 미니 지도에서 동네를 누르면 MAP-07에 `areaTagId` |
 | T-18 조건에 맞는 메이트 없음 | (MAP-07의 `emptyReason = NO_MATE`) | – |
 | T-11b 공개 스팟 미리보기 | MAP-08 | MATCH-01 ("この地図を選ぶ") / MATCH-07 ("この地図をやめる") |
 | T-12a 매칭 중 (애니메이션) | (MATCH-01 응답을 받은 뒤 약 2.5초 표시) | → T-20 |
@@ -1205,9 +1253,9 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 | 화면 | 들어올 때 | 버튼·동작 |
 | --- | --- | --- |
 | M-00 스플래시 | – | – |
-| M-02 가입 · 본인 인증 | – | Supabase 가입·로그인 → AUTH-01 → USER-02 (최신 디자인은 휴대폰 인증이라 여권 단계가 없다. USER-02를 부르지 않으면 MAP-01이 403 `NOT_VERIFIED`. 6장 12번) |
+| M-02 가입 · 본인 인증 | – | Supabase 가입·로그인 → AUTH-01 (메이트는 이때 바로 인증 완료. 휴대폰 인증 화면은 시연용, USER-02 부르지 않음) |
 | M-03 프로필 등록 | – | UPLOAD-01 → USER-03 |
-| M-04 / M-04b 추천 가능 취향 · 최애 · 동네 | TAG-01 | TAG-02 (잘 아는 동네 = AREA 분류. 최애는 6장 13번) |
+| M-04 / M-04b 추천 가능 취향 · 최애 · 동네 | TAG-01 | TAG-02 (잘 아는 동네 = AREA 분류, 최애 = `OSHI_` 분류) |
 | M-10 내 지도 목록 | MAP-02 | – |
 | M-10a 내 지도 상세 | MAP-03 | (디자인: 공개 중인 지도는 수정 버튼 없이 ⓘ 툴팁. 서버는 "지도 수정 잠금" 표 기준이라 디자인보다 너그럽다. 앱이 디자인대로 막아도 충돌 없음) |
 | M-11 지도 이름 · 캡션 | – | MAP-01 / MAP-04 |
@@ -1233,7 +1281,7 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 | C-03 / C-04 / C-06 점 3개 메뉴 · 차단 · 신고 | – | BLOCK-01 (채팅에서만), MATCH-07, REPORT-01 |
 | C-05 AI 코스 추천 | (화면만, OPT-01) | – |
 | C-07 대화 목록 (여행자) | MATCH-02 (state 생략. `chatStatus`가 OPEN이면 대화, LOCKED·READY면 잠김, 끝난 매칭은 앨범) | CHAT-02로 이동 / ALBUM-01로 이동 |
-| C-02a 받은 리뷰 모음 | (API 없음. 6장 18번) | – |
+| C-02a 받은 리뷰 모음 | REVIEW-03 | – |
 | 차단당한 쪽 의견 남기기 | MATCH-03 (`feedbackAvailable`) | BLOCK-03 |
 
 ---
@@ -1244,7 +1292,7 @@ MATCH-02의 항목 하나와 같은 형태에 아래가 추가된다.
 
 | 순서 | 누가 | 동작 | API |
 | --- | --- | --- | --- |
-| 1 | 메이트 | 가입 → 본인 인증 → 프로필 → 취향 | Supabase 가입, AUTH-01, USER-02, USER-03, TAG-02 |
+| 1 | 메이트 | 가입 → 본인 인증 → 프로필 → 취향 | Supabase 가입, AUTH-01 (바로 인증 완료), USER-03, TAG-02 |
 | 2 | 메이트 | 지도 만들고 스팟 5곳 등록, 공개 스팟 2곳 지정 | MAP-01, UPLOAD-01, SPOT-01 ×5, MAP-06 |
 | 3 | 여행자 | 가입 → 여권 인증 → 프로필 → 취향 → 매칭 조건 → 일정 | Supabase 가입, AUTH-01, USER-02, USER-03, TAG-02, PREF-02, TRIP-01 |
 | 4 | 여행자 | 지도 고르기 → 공개 스팟 미리보기 → 이 지도 선택 (= 매칭) | MAP-07, MAP-08, MATCH-01 |
@@ -1309,29 +1357,30 @@ API를 새로 만들지 않고 MAP-07 카드에 `matchReason`을 추가해 채�
 | 4 | AI 코스 추천에 어떤 스팟을 쓰나? | **비밀지도의 숨겨진 스팟을 쓰면 '비밀'이 깨진다.** 공개 스팟(각 지도의 2곳)만 후보로 쓰는 것을 제안 |
 | 5 | 지도 SDK·장소 검색은 무엇을 쓰나? | **확정**: 네이버 지도. 장소 검색을 서버가 대신 호출할지(PLACE-01: `GET /places/search?query=`, 네이버 지역 검색, 키는 서버에만)는 앱 B와 결정 대기 |
 | 6 | 매칭 조건을 바꾸면 목록이 바로 바뀌나? | **확정**: 바로 바뀐다 (하루 1회 규칙이 없어짐) |
-| 7 | 상호 후기도 번역하나? | 지금은 원문만 내려간다. 번역하려면 `reviews.content_translated` 컬럼을 마이그레이션으로 추가해야 한다 (서버 A와 결정 필요) |
+| 7 | 상호 후기도 번역하나? | **확정 (v1.9)**: 번역한다. V5에서 `reviews.content_translated` 추가 (REVIEW-02 · 03) |
 | 8 | 지도 수정 잠금 범위 | **확정**: 여행 중인 여행자가 없으면 공개 스팟만 잠금(노출 해제 → 수정 → 재공개), 있으면 기존 스팟·지도 이름 잠금 + 새 스팟 추가만 허용(수정 전·후 장소가 둘 다 보임). 여행자 동의를 받고 수정하는 기능은 정식 버전 (MAP-06 위 표) |
 | 9 | 숨긴 스팟을 미리보기에서 어떻게 보여 주나? | **확정**: 서버는 개수만 준다. 자물쇠 핀은 장식용 위치에 그린다 (MAP-08) |
 | 10 | 별점을 다음 추천에 반영하나? (T-32 안내 문구) | **MVP에서는 반영 안 함.** 인기순은 지도가 선택된 횟수 기준. 최신 디자인(T-32 · M-41)에도 "별점은 다음 추천에 반영" 문구가 남아 있어, 실제 앱에서는 이 문장을 빼는 것을 제안 |
 | 11 | 푸시 알림 (화면 명세 "외부 연동") | MVP는 앱 안 알림 목록(NOTI)만. 푸시는 F-OPT-03으로 시간이 되면 |
 
-**11/26 2차 디자인 변경과 서버 영향** (디자인 개발 전달 패키지 v4). 지금 서버는 v1.7 규칙 그대로다. 아래는 결선 범위를 정한 뒤 반영한다.
+**11/26 2차 디자인 변경과 서버 영향** (디자인 개발 전달 패키지 v4). **팀 결정(11/27): 최종본은 모두 반영한다.** 반영 상태는 각 줄 끝에 적는다.
 
 | # | 디자인 변경 | 지금 서버 | 반영한다면 | 담당 |
 | --- | --- | --- | --- | --- |
-| 12 | 메이트 가입은 휴대폰 본인인증, 여권 단계 없음 (M-02) | 여권 인증(USER-02) 전에는 MAP-01이 403 `NOT_VERIFIED` | 메이트는 회원 등록(AUTH-01) 때 바로 `VERIFIED`. 휴대폰 인증 자체는 Supabase Phone 로그인(SMS 발송 설정 필요) | 서버 A |
-| 13 | 推し · 최애 선택 시트 (T-05b · M-04b): K-POP 그룹·멤버, 드라마, 애니, 야구팀 | 태그 없음 | 취향 분류를 추가하고 항목을 넣는 마이그레이션(V4). 그룹 → 멤버는 3단계 태그 | 서버 B |
-| 14 | 여행자 「行ってみたい街」 · 메이트 "잘 아는 동네"는 점수 밖 (동점일 때만 우선) | 여행자에게는 AREA 분류를 숨김. 추천순은 겹치는 태그 수(모든 분류) | 여행자도 AREA 저장 허용, 추천순 계산에서 AREA 제외 후 동점 비교에만 사용 | 서버 A · B |
-| 15 | 지도 고르기 위쪽 미니 지도: 동네를 누르면 그 동네 지도만 (T-11) | MAP-07에 동네 조건 없음 | MAP-07에 동네 파라미터와 카드의 동네 이름 추가. 지도의 동네를 무엇으로 정할지(메이트의 잘 아는 동네 / 스팟 주소) 결정 필요 | 서버 B |
-| 16 | 취향 선택 개수 제한 없음 (T-05) | 분류당 2개 · 전체 14개 (TAG-02 `TAG_COUNT_INVALID`) | 개수 검사 해제 (1개 이상만) | 서버 A |
+| 12 | 메이트 가입은 휴대폰 본인인증, 여권 단계 없음 (M-02) | 여권 인증(USER-02) 전에는 MAP-01이 403 `NOT_VERIFIED` | 메이트는 회원 등록(AUTH-01) 때 바로 `VERIFIED`. 휴대폰 인증 자체는 Supabase Phone 로그인(SMS 발송 설정 필요) | 서버 B (서버 A 동의) · **반영 (AUTH-01, V6)**. 실제 문자 인증은 결선 이후 |
+| 13 | 推し · 최애 선택 시트 (T-05b · M-04b): K-POP 그룹·멤버, 드라마, 애니, 야구팀 | 태그 없음 | 취향 분류를 추가하고 항목을 넣는 마이그레이션(V4). 그룹 → 멤버는 3단계 태그 | 서버 B · **V4 반영** (21번과 함께) |
+| 14 | 여행자 「行ってみたい街」 · 메이트 "잘 아는 동네"는 점수 밖 (동점일 때만 우선) | 여행자에게는 AREA 분류를 숨김. 추천순은 겹치는 태그 수(모든 분류) | 여행자도 AREA 저장 허용, 추천순 계산에서 AREA 제외 후 동점 비교에만 사용 | 서버 B · **반영 (MAP-07 추천순, TAG-02 여행자 AREA 저장)** |
+| 15 | 지도 고르기 위쪽 미니 지도: 동네를 누르면 그 동네 지도만 (T-11) | MAP-07에 동네 조건 없음 | MAP-07에 동네 파라미터와 카드의 동네 이름 추가. 지도의 동네를 무엇으로 정할지(메이트의 잘 아는 동네 / 스팟 주소) 결정 필요 | 서버 B · **반영**: 스팟 좌표로 정한다 (MAP-07 `areaTagId` · `area` · `areas`) |
+| 16 | 취향 선택 개수 제한 없음 (T-05) | 분류당 2개 · 전체 14개 (TAG-02 `TAG_COUNT_INVALID`) | 개수 검사 해제 (1개 이상만) | 서버 B (서버 A 동의) · **반영 (TAG-02)** |
 | 17 | 매칭 조건 연령대는 나이 범위 슬라이더 18 ~ 50+ (T-06) | `ageGroups` 칩 목록 | 서버는 그대로 두고 앱이 범위를 연령대 목록으로 바꿔 보낸다 (예: 20~35세 → `[20, 30]`, 18·19세는 20대) | 앱 A |
-| 18 | 받은 리뷰 모음: 평균 별점 · 분포 · 목록 · 번역 (C-02a) | API 없음, 후기 번역 칸 없음 (7번) | `GET /users/me/reviews` 추가, 번역하려면 `reviews.content_translated` 마이그레이션. 시연 플로우에는 없음 | 서버 B |
+| 18 | 받은 리뷰 모음: 평균 별점 · 분포 · 목록 · 번역 (C-02a) | API 없음, 후기 번역 칸 없음 (7번) | `GET /users/me/reviews` 추가, 번역하려면 `reviews.content_translated` 마이그레이션. 시연 플로우에는 없음 | 서버 B · **반영 (REVIEW-03, V5)**. 시연 데이터에 지난 여행 후기도 넣음 |
 | 19 | 매칭 중 · 앨범 만드는 중 애니메이션, 여행 완료 확인 시트 (T-12a · T-30a · T-29) | – | 서버 변경 없음 (3장 매핑) | 앱 |
 | 20 | 대화 목록 (C-07) | MATCH-02로 가능 | 서버 변경 없음 (3장 매핑) | 앱 A |
+| 21 | 취향 목록 자체가 바뀜 (v9 블루): 카페 / 맛집 / 뷰티 / 쇼핑 / 동네 산책 / 문화·체험 + 推し, 3단계 세부 (T-05 · T-05a) | V3 분류 7개 · 항목 30개 | 태그 데이터 교체(V4), TAG-01 3단계 트리, TAG-02 3단계 저장 | 서버 B · **반영 (V4, TAG-01 3단계 트리, TAG-02 세부 저장)** |
 
 ---
 
-## 7. ERD에 반영한 변경 (v2 → v2.6)
+## 7. ERD에 반영한 변경 (v2 → v2.7)
 
 | 변경 | 이유 |
 | --- | --- |
@@ -1349,4 +1398,7 @@ API를 새로 만들지 않고 MAP-07 카드에 `matchReason`을 추가해 채�
 | SECRET_MAPS.title_translated 추가 (v2.6) | 여행자에게 지도 제목을 일본어로 보여 줌 (MAP-07·08) |
 | MATCHES.cancel_reason·cancel_detail·canceled_by 추가 (v2.6) | 매칭 끊기 사유(선택)와 끊은 사람 기록 (MATCH-07) |
 | MATCHES.traveler_chat_ok·mate_chat_ok 사용 안 함, chat_status 값 LOCKED·READY·OPEN (v2.6) | 채팅은 여행자가 바로 연다 (CHAT-01) |
+| REVIEWS.content_translated 추가 (v2.7, V5) | 상호 후기 번역 (REVIEW-02 · 03) |
+| TAGS 데이터 교체 (v2.7, V4) | 디자인 최종본 취향 목록. 테이블 구조는 그대로 |
+| 기존 메이트 verify_status = VERIFIED (v2.7, V6) | 메이트는 회원 등록 때 바로 인증 완료 (AUTH-01) |
 | VISIT_REACTIONS는 그대로 두고 행 종류로 구분 (v2.6) | emoji가 있는 행 = 리액션(방문 기록당 1개, LIKE·LAUGH·CHEER), comment가 있는 행 = 댓글. 테이블 변경 없이 VISIT-03~05 지원 |

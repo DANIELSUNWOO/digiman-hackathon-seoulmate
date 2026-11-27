@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 import server.global.error.ApiException;
 import server.global.error.ErrorCode;
 import server.map.domain.SecretMap;
@@ -20,7 +21,9 @@ import server.match.repository.MatchRepository;
 import server.safety.domain.Block;
 import server.safety.domain.ReportReason;
 import server.safety.repository.BlockRepository;
+import server.tag.domain.Tag;
 import server.tag.domain.UserTag;
+import server.tag.repository.TagRepository;
 import server.tag.repository.UserTagRepository;
 import server.trip.domain.Trip;
 import server.trip.repository.TripRepository;
@@ -60,6 +63,7 @@ class MapBrowseIntegrationTest {
     @Autowired SpotRepository spotRepository;
     @Autowired MatchRepository matchRepository;
     @Autowired BlockRepository blockRepository;
+    @Autowired TagRepository tagRepository;
 
     private final LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
     private final LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
@@ -75,11 +79,15 @@ class MapBrowseIntegrationTest {
         for (long id : tagIds) userTagRepository.save(UserTag.of(u.getId(), id));
     }
 
-    /** spotCount 곳짜리 지도. previewCount 가 2 면 공개 지도 */
+    /** spotCount 곳짜리 지도. previewCount 가 2 면 공개 지도 (스팟 위치는 성수) */
     private Long map(User mate, String title, int spotCount, int previewCount) {
+        return map(mate, title, spotCount, previewCount, "37.5447000", "127.0582000");
+    }
+
+    private Long map(User mate, String title, int spotCount, int previewCount, String lat, String lng) {
         SecretMap map = mapRepository.save(SecretMap.of(mate.getId(), title, "캡션", now));
         for (int i = 0; i < spotCount; i++) {
-            Spot s = Spot.of(map.getId(), "스팟" + i, null, new BigDecimal("37.5447000"), new BigDecimal("127.0582000"),
+            Spot s = Spot.of(map.getId(), "스팟" + i, null, new BigDecimal(lat), new BigDecimal(lng),
                     null, "이유" + i, null, i);
             s.setPreview(i < previewCount);
             spotRepository.save(s);
@@ -227,5 +235,44 @@ class MapBrowseIntegrationTest {
 
     private MatchPreference pref(User t) {
         return preferenceRepository.findById(t.getId()).orElseThrow();
+    }
+
+    /** 디자인 11/26: 미니 지도 동네 필터, 동네는 점수 밖(동점일 때만 우선), 세부는 항목으로 묶어 센다 */
+    @Test
+    @Transactional   // 동네·취향 태그를 만들므로 끝나면 되돌린다 (다른 테스트의 태그 트리에 섞이지 않게)
+    void 동네로_거르고_동네는_점수_밖이며_세부는_항목으로_묶어_센다() {
+        Tag area = tagRepository.save(Tag.of(null, "AREA", "동네", "エリア", 1));
+        Tag seongsu = tagRepository.save(Tag.of(area.getId(), "AREA", "성수", "聖水", 2));
+        Tag yeonnam = tagRepository.save(Tag.of(area.getId(), "AREA", "연남", "延南洞", 2));
+        Tag food = tagRepository.save(Tag.of(null, "FOOD", "맛집", "グルメ", 1));
+        Tag localFood = tagRepository.save(Tag.of(food.getId(), "FOOD", "로컬 식당", "ローカル食堂", 2));
+        Tag nojeon = tagRepository.save(Tag.of(localFood.getId(), "FOOD", "노포", "老舗", 3));
+
+        // 여행자: 세부(노포) + 가 보고 싶은 동네(연남). 다른 테스트와 겹치지 않게 남성·40대 조건
+        User t = traveler(GenderPref.MALE, 40, nojeon.getId(), yeonnam.getId());
+        User a = user("KR", Gender.MALE, 1982);                  // 항목(로컬 식당)이 겹침 → 점수 1
+        tags(a, localFood.getId(), seongsu.getId());
+        Long seongsuMap = map(a, "성수 지도", 5, 2);
+        User c = user("KR", Gender.MALE, 1984);                  // 아무것도 안 겹침 (먼저 만들어 mapId 가 더 작다)
+        Long otherMap = map(c, "성수 지도 2", 5, 2);
+        User b = user("KR", Gender.MALE, 1983);                  // 취향은 안 겹치고 동네만 맞음 → 점수 0
+        tags(b, yeonnam.getId());
+        Long yeonnamMap = map(b, "연남 지도", 5, 2, "37.5617000", "126.9247000");
+        userTagRepository.flush();                               // 읽기 전용 조회 전에 취향 저장을 DB 에 반영
+
+        MapBrowseResponse all = mapBrowseService.browse(t.getId(), null, null, null, null, null, 50);
+        // 취향 점수(세부 → 항목) 먼저, 점수가 같으면 동네가 맞는 지도가 앞 (mapId 가 더 커도)
+        assertThat(ids(all)).containsExactly(seongsuMap, yeonnamMap, otherMap);
+        assertThat(all.items().getFirst().area().name()).isEqualTo("聖水");
+        assertThat(all.areas()).extracting(MapBrowseService.AreaCount::name, MapBrowseService.AreaCount::mapCount)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("聖水", 2L), org.assertj.core.groups.Tuple.tuple("延南洞", 1L));
+
+        MapBrowseResponse onlyYeonnam = mapBrowseService.browse(t.getId(), null, null, null, yeonnam.getId(), null, 50);
+        assertThat(ids(onlyYeonnam)).containsExactly(yeonnamMap);
+        assertThat(onlyYeonnam.totalCount()).isEqualTo(1);
+        assertThat(onlyYeonnam.areas()).extracting(MapBrowseService.AreaCount::mapCount).containsExactly(2L, 1L);  // 말풍선 숫자는 그대로
+
+        assertError(() -> mapBrowseService.browse(t.getId(), null, null, null, nojeon.getId(), null, 50),
+                ErrorCode.VALIDATION_ERROR);                     // 동네가 아닌 태그로는 거를 수 없다
     }
 }

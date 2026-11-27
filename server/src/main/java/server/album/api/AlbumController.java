@@ -52,4 +52,10 @@ public class AlbumController {
     public List<AlbumReviewService.ReviewView> reviews(AuthUser me, @PathVariable Long matchId) {
         return albumReviewService.reviews(me, matchId);
     }
+
+    @Operation(summary = "REVIEW-03 받은 후기 모음 (C-02a: 평균 별점·별 개수별 분포·최근 순 목록, 여행자·메이트 공통)")
+    @GetMapping("/api/v1/users/me/reviews")
+    public AlbumReviewService.ReceivedReviews received(AuthUser me) {
+        return albumReviewService.received(me);
+    }
 }

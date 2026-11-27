@@ -18,6 +18,21 @@ final class DemoSeedData {
     private DemoSeedData() {
     }
 
+    /** 지난 여행자 닉네임 (받은 후기 모음 C-02a 에 그대로 보인다. 디자인 시안 이름) */
+    static final List<String> PAST_TRAVELER_NAMES = List.of("ゆき", "はると", "さくら", "みお", "そうた", "あおい");
+
+    /** 지난 여행마다 여행자가 메이트에게 남긴 후기 (C-02a 시연용, 차례대로 돌려 쓴다). 일본어 원문 + 한국어 번역 */
+    static final List<ReviewSeed> REVIEWS = List.of(
+            new ReviewSeed(5, "ガイドブックにないソウルを楽しめました。", "가이드북에 없는 서울을 즐길 수 있었어요."),
+            new ReviewSeed(5, "地図の説明が親切で、一人でも迷いませんでした。", "지도 설명이 친절해서 혼자서도 헤매지 않았어요."),
+            new ReviewSeed(5, "すぐにリアクションをくれて、一人旅でも心強かったです。", "리액션을 바로 남겨 줘서 혼자 여행인데도 든든했어요."),
+            new ReviewSeed(4, "路地が少し難しかったけど、そのぶん地元らしかったです。", "골목이 조금 어려웠지만, 그래서 더 현지 같았어요."),
+            new ReviewSeed(5, "次にソウルに来たら、また別の地図で歩きたいです。", "다음에 서울에 오면 또 다른 지도로 걷고 싶어요."),
+            new ReviewSeed(4, "写真を撮りたくなる場所ばかりでした。", "사진 찍고 싶은 곳뿐이었어요."));
+
+    record ReviewSeed(int rating, String ja, String ko) {
+    }
+
     record MateSeed(UUID id, String nickname, Gender gender, int birthYear, String bio,
                     List<String> tagNamesKo, List<MapSeed> maps) {
     }
@@ -51,7 +66,7 @@ final class DemoSeedData {
     static final List<MateSeed> MATES = List.of(
             new MateSeed(MARKER, "성수민지", Gender.FEMALE, 1998,
                     "성수에서 7년째 살아요. 골목 카페랑 공원 산책을 좋아해요.",
-                    List.of("카페", "골목 산책", "공원", "성수"),
+                    List.of("조용한 카페", "감성 카페", "골목", "한강·공원", "NewJeans", "성수"),
                     List.of(new MapSeed("성수 골목 산책", "聖水の路地さんぽ",
                             "공장 골목 사이사이, 동네 사람이 걷는 길만 모았어요",
                             "工場の路地のあいだ、地元の人が歩く道だけを集めました", 6, List.of(
@@ -86,7 +101,7 @@ final class DemoSeedData {
 
             new MateSeed(UUID.fromString("00000000-0000-4000-8000-00000000d002"), "을지준호", Gender.MALE, 1993,
                     "을지로 인쇄소 골목에서 일해요. 오래된 가게와 밤 산책을 좋아해요.",
-                    List.of("술", "야경", "골목 산책", "을지로"),
+                    List.of("로컬 식당", "노포", "술 한잔", "야경", "레트로", "두산 베어스", "을지로"),
                     List.of(new MapSeed("을지로 레트로 밤산책", "乙支路レトロ夜さんぽ",
                                     "낮엔 인쇄소, 밤엔 불빛이 켜지는 골목들",
                                     "昼は印刷所、夜は灯りがともる路地", 4, List.of(
@@ -140,7 +155,7 @@ final class DemoSeedData {
 
             new MateSeed(UUID.fromString("00000000-0000-4000-8000-00000000d003"), "연남하은", Gender.FEMALE, 2000,
                     "연남동 토박이예요. 빵집과 독립서점 지도는 자신 있어요.",
-                    List.of("카페", "디저트", "서점", "연남", "망원"),
+                    List.of("베이커리", "디저트", "서점·문구", "소품샵", "선재 업고 튀어", "연남", "망원"),
                     List.of(new MapSeed("연남·망원 느린 산책", "延南・望遠のんびりさんぽ",
                             "기찻길이 공원이 된 동네를 천천히 걸어요",
                             "線路跡が公園になった街をのんびり歩きます", 3, List.of(
@@ -171,7 +186,7 @@ final class DemoSeedData {
 
             new MateSeed(UUID.fromString("00000000-0000-4000-8000-00000000d004"), "북촌도윤", Gender.MALE, 1990,
                     "북촌 한옥에서 자랐어요. 궁과 골목, 전통 공예 가게를 안내할게요.",
-                    List.of("사진", "갤러리", "골목 산책", "익선"),
+                    List.of("전시·갤러리", "사진관·네컷", "한복", "전통찻집", "BTS", "익선"),
                     List.of(new MapSeed("한옥 골목과 궁 산책", "韓屋の路地と王宮さんぽ",
                             "기와지붕 사이로 걷는 서울의 옛 동네",
                             "瓦屋根のあいだを歩く、ソウルの昔の街並み", 5, List.of(

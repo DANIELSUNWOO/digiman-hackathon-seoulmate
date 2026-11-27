@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 import server.map.domain.SecretMap;
 import server.match.domain.Match;
 import server.match.domain.MatchStatus;
+import server.tag.domain.Tag;
 import server.tag.domain.UserTag;
 import server.user.domain.Role;
 import server.user.domain.User;
@@ -26,6 +27,14 @@ public interface MapBrowseQueries extends Repository<SecretMap, Long> {
 
     @Query("select ut from UserTag ut where ut.userId in :userIds")
     List<UserTag> findTagsOf(@Param("userIds") Collection<UUID> userIds);
+
+    /** 취향 태그 전체 (160개 남짓): 3단계 세부 → 2단계 항목 묶기, 동네(AREA) 구분 */
+    @Query("select t from Tag t")
+    List<Tag> findAllTags();
+
+    /** 지도별 스팟 가운데 위치 (지도의 동네 정하기). 결과: [mapId, avgLat, avgLng] */
+    @Query("select s.mapId, avg(s.lat), avg(s.lng) from Spot s where s.mapId in :mapIds group by s.mapId")
+    List<Object[]> centerOfMaps(@Param("mapIds") Collection<Long> mapIds);
 
     @Query("select sm from SecretMap sm where sm.mateId in :mateIds")
     List<SecretMap> findMapsOf(@Param("mateIds") Collection<UUID> mateIds);

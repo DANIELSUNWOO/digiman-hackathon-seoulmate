@@ -2,6 +2,7 @@ package server.album.domain;
 
 import java.util.UUID;
 
+import org.hibernate.annotations.DynamicUpdate;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 
 /** [서버 B 소유] 상호 후기 */
 @Entity
+@DynamicUpdate   // 바뀐 칸만 UPDATE: 번역 저장이 다른 칸을 덮지 않는다
 @Table(name = "reviews")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -34,6 +36,9 @@ public class Review {
     @Column(columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "content_translated", columnDefinition = "TEXT")
+    private String contentTranslated;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -47,4 +52,6 @@ public class Review {
         r.createdAt = now;
         return r;
     }
+
+    public void fillTranslation(String translated) { this.contentTranslated = translated; }
 }

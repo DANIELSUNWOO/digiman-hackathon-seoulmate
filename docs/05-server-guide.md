@@ -27,10 +27,10 @@
 | 화면 | 호출 |
 |---|---|
 | T-04 프로필 | `PUT /users/me/profile` (닉네임 2~8자) |
-| T-05 취향 | `GET /tags` → `PUT /users/me/tags` (분류당 2개, 전체 14개). 분류의 `category` 가 `AREA` 면 여행자 화면에서는 숨긴다 |
+| T-05 취향 | `GET /tags` (분류 → 항목 → 세부 3단계) → `PUT /users/me/tags` (1개 이상, 개수 제한 없음, 항목·세부 모두). `AREA` 는 「行ってみたい街」로 여행자도 고른다 |
 | T-06 매칭 조건 | `PUT /users/me/match-preferences` |
 | T-07 일정 | `POST /trips` `{startDate, endDate}` |
-| T-11 지도 고르기 | `GET /maps` (정렬·핀 필터, `emptyReason` 으로 빈 화면 2종) |
+| T-11 지도 고르기 | `GET /maps` (정렬·핀 필터, 미니 지도 동네 = `areaTagId`·응답 `areas`, `emptyReason` 으로 빈 화면 2종) |
 | T-11b 미리보기 | `GET /maps/{mapId}/preview` |
 | "この地図を選ぶ" | **`POST /matches {mapId}`** → 바로 `ON_COURSE`, `slots` 로 "빈 칸 n/5" 갱신 |
 | T-20 홈(여행 중) | `GET /matches?state=active` (지도 여러 개면 캐러셀) |
@@ -41,13 +41,15 @@
 | T-92·93 끊기 | `POST /matches/{id}/cancel {reason?, detail?}` → 홈으로, `slots` 갱신 |
 | T-30 여행 완료 | `POST /matches/{id}/complete` → `albumId` |
 | T-31·32 앨범·후기 | `GET /matches/{id}/album` · `POST /matches/{id}/reviews` |
+| C-02a 받은 후기 | `GET /users/me/reviews` → `{average, count, distribution, items}` (여행자·메이트 공통) |
 | C-02 마이 | `GET /users/me/stats` → `{tripDay, matesMet, visitedSpots}` (`tripDay` 는 여행 시작 전이면 null) |
 
 ## 4. 메이트(한국) 흐름
 
 | 화면 | 호출 |
 |---|---|
-| M-03·04 프로필·취향 | 여행자와 같음. 메이트는 `AREA`(잘 아는 동네)까지 보여 준다 |
+| M-02 가입 | `POST /users {country: "KR"}` 만 부르면 바로 `VERIFIED` (휴대폰 인증 화면은 시연용, 여권 API 안 부름) |
+| M-03·04 프로필·취향 | 여행자와 같음. `AREA` 는 "잘 아는 동네" |
 | M-10~14 지도 만들기 | `POST /maps` → `POST /maps/{id}/spots` (5곳 이상) → `PUT /maps/{id}/previews` (정확히 2곳) |
 | M-20 홈 | `GET /matches?state=active` → 개수가 "함께 여행 중 n / 10" |
 | M-15 지도별 대화 목록 | **`GET /matches?mapId={mapId}`** (`chatStatus` 가 OPEN 이 아니면 잠금 표시) |

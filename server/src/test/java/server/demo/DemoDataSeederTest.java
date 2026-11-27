@@ -10,6 +10,7 @@ import server.map.repository.SecretMapRepository;
 import server.map.repository.SpotRepository;
 import server.map.service.MapVisibility;
 import server.match.domain.MatchStatus;
+import server.album.repository.ReviewRepository;
 import server.match.repository.MatchRepository;
 import server.user.repository.UserRepository;
 
@@ -31,6 +32,7 @@ class DemoDataSeederTest {
     @Autowired SpotRepository spotRepository;
     @Autowired MatchRepository matchRepository;
     @Autowired MapVisibility mapVisibility;
+    @Autowired ReviewRepository reviewRepository;
 
     @Test
     void 메이트와_공개_지도를_한_번만_넣는다() {
@@ -53,10 +55,24 @@ class DemoDataSeederTest {
         var mate = userRepository.findById(DemoSeedData.MARKER).orElseThrow();
         assertThat(mate.isVerified()).isTrue();
         assertThat(mate.isMate()).isTrue();
+
+        // 받은 후기 모음(C-02a): 지난 여행마다 여행자 후기 하나 (번역 포함). 두 번째 seed() 에서도 늘지 않는다
+        int pastTrips = DemoSeedData.MATES.stream().flatMap(m -> m.maps().stream())
+                .mapToInt(ms -> Math.min(ms.pastTravelers(), 6)).sum();
+        var reviews = DemoSeedData.MATES.stream()
+                .flatMap(m -> reviewRepository.findByRevieweeIdOrderByCreatedAtDescIdDesc(m.id()).stream()).toList();
+        assertThat(reviews).hasSize(pastTrips);
+        assertThat(reviews).allMatch(r -> r.getContent() != null && r.getContentTranslated() != null);
+        assertThat(matchRepository.findMine(DemoSeedData.MARKER, List.of(MatchStatus.COMPLETED)))
+                .allMatch(m -> reviewRepository.existsByMatchIdAndReviewerId(m.getId(), m.getTravelerId()));
+        var reviewer = userRepository.findById(reviews.get(0).getReviewerId()).orElseThrow();
+        assertThat(DemoSeedData.PAST_TRAVELER_NAMES).contains(reviewer.getNickname());
     }
 
     @Test
     void 시드_데이터는_명세의_입력_제한을_지킨다() {
+        assertThat(DemoSeedData.REVIEWS).allMatch(r -> r.rating() >= 1 && r.rating() <= 5 && r.ja().length() <= 300);
+        assertThat(DemoSeedData.PAST_TRAVELER_NAMES).allMatch(n -> n.length() >= 2 && n.length() <= 8);
         for (var m : DemoSeedData.MATES) {
             assertThat(m.nickname().length()).isBetween(2, 8);
             assertThat(m.bio().length()).isLessThanOrEqualTo(200);

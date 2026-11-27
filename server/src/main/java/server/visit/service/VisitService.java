@@ -30,9 +30,9 @@ import server.visit.repository.VisitReactionRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -80,10 +80,10 @@ public class VisitService {
                 TRAVELER_LANG, MATE_LANG);
         notificationPublisher.publish(m.getMateId(), NotificationType.VISIT, matchId, spot.getName());
 
-        boolean chatRequested = matchProgressService.onVisitVerified(matchId);
+        boolean chatReady = matchProgressService.onVisitVerified(matchId);   // 필요 인증 수에 처음 닿으면 true (READY)
         Progress progress = new Progress(visitRepository.countByMatchId(matchId), m.getRequiredVisits(),
                 spotRepository.countByMapId(m.getCourseMapId()));
-        return new VisitCreated(visit.getId(), spot.getId(), Times.kst(visit.getVerifiedAt()), progress, chatRequested);
+        return new VisitCreated(visit.getId(), spot.getId(), Times.kst(visit.getVerifiedAt()), progress, chatReady);
     }
 
     /** VISIT-02 방문 기록 목록 (최근 인증 순, 리액션 포함). 위치 정보는 내려주지 않는다 */
@@ -95,10 +95,14 @@ public class VisitService {
 
         Map<Long, String> spotNames = spotRepository.findAllById(visits.stream().map(SpotVisit::getSpotId).toList())
                 .stream().collect(Collectors.toMap(Spot::getId, Spot::getName));
-        Map<Long, List<ReactionView>> reactions = reactionRepository
-                .findByVisitIdInOrderByIdAsc(visits.stream().map(SpotVisit::getId).toList()).stream()
+        // visit_reactions 한 테이블에 리액션(emoji 행)과 댓글(comment 행)이 함께 있다
+        List<VisitReaction> rows = reactionRepository.findByVisitIdInOrderByIdAsc(visits.stream().map(SpotVisit::getId).toList());
+        Map<Long, String> reactionByVisit = new HashMap<>();
+        rows.stream().filter(r -> ReactionType.isValid(r.getEmoji()))
+                .forEach(r -> reactionByVisit.putIfAbsent(r.getVisitId(), r.getEmoji()));
+        Map<Long, List<CommentView>> commentsByVisit = rows.stream().filter(VisitReaction::isComment)
                 .collect(Collectors.groupingBy(VisitReaction::getVisitId,
-                        Collectors.mapping(VisitService::reactionView, Collectors.toList())));
+                        Collectors.mapping(VisitService::commentView, Collectors.toList())));
 
         return visits.stream().map(v -> new VisitView(
                 v.getId(),
@@ -106,31 +110,77 @@ public class VisitService {
                 v.getPhotoUrl(),
                 LocalizedText.of(v.getReview(), v.getReviewTranslated(), TRAVELER_LANG),
                 Times.kst(v.getVerifiedAt()),
-                reactions.getOrDefault(v.getId(), List.of()))).toList();
+                reactionByVisit.get(v.getId()),
+                commentsByVisit.getOrDefault(v.getId(), List.of()))).toList();
     }
 
-    /** VISIT-03 메이트의 리액션·댓글. 이모지와 댓글 중 하나 이상. 차단 관계면 불가 */
+    /** VISIT-03 리액션 누르기·바꾸기 (방문 기록당 1개). 처음 누를 때만 여행자에게 REACTION 알림 */
     @Transactional
-    public ReactionCreated react(AuthUser me, Long visitId, ReactionRequest req) {
+    public ReactionResult setReaction(AuthUser me, Long visitId, ReactionRequest req) {
+        ReactionType type = ReactionType.from(req.type());
+        Target t = writableTarget(me, visitId);
+        List<VisitReaction> current = reactionRows(visitId);
+        if (current.isEmpty()) {
+            reactionRepository.save(VisitReaction.reaction(visitId, me.id(), type.name(), now()));
+            notificationPublisher.publish(t.match().getTravelerId(), NotificationType.REACTION, t.match().getId());
+        } else {
+            // 첫 행만 남겨 바꾸고, 나머지(이전 버전에서 여러 번 남긴 리액션)는 정리한다
+            current.get(0).changeReaction(type.name());
+            current.subList(1, current.size()).forEach(this::removeReaction);
+        }
+        return new ReactionResult(visitId, type.name());
+    }
+
+    /** VISIT-04 리액션 해제. 이미 없으면 그대로 204 */
+    @Transactional
+    public void clearReaction(AuthUser me, Long visitId) {
+        writableTarget(me, visitId);
+        reactionRows(visitId).forEach(this::removeReaction);
+    }
+
+    /** VISIT-05 댓글. 일본어로 번역하고 여행자에게 REACTION 알림 */
+    @Transactional
+    public CommentCreated comment(AuthUser me, Long visitId, CommentRequest req) {
+        String content = blankToNull(req.content());
+        if (content == null) throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        Target t = writableTarget(me, visitId);
+        VisitReaction c = reactionRepository.save(VisitReaction.comment(visitId, me.id(), content, now()));
+        translationService.translateAsync(TranslationTarget.REACTION_COMMENT, c.getId(), content, MATE_LANG, TRAVELER_LANG);
+        notificationPublisher.publish(t.match().getTravelerId(), NotificationType.REACTION, t.match().getId());
+        return new CommentCreated(c.getId());
+    }
+
+    /**
+     * 리액션·댓글을 남길 수 있는 방문 기록인지 확인한다: 그 매칭의 메이트이고, 차단 관계가 아니어야 한다.
+     * 매칭 행을 잠가서 같은 방문 기록에 리액션이 두 개 생기지 않게 한다.
+     */
+    private Target writableTarget(AuthUser me, Long visitId) {
         SpotVisit visit = visitRepository.findById(visitId)
                 .orElseThrow(() -> new ApiException(ErrorCode.VISIT_NOT_FOUND));
-        Match m = matchAccess.mateMember(visit.getMatchId(), me, false);
+        Match m = matchAccess.mateMember(visit.getMatchId(), me, true);
         // 여행이 끝난 뒤 차단하면 매칭 상태는 COMPLETED 로 남으므로 차단 관계도 확인한다
         if (m.getStatus() == MatchStatus.BLOCKED || blockRepository.existsBetween(m.getTravelerId(), m.getMateId())) {
             throw new ApiException(ErrorCode.MATCH_NOT_ACTIVE);
         }
+        return new Target(visit, m);
+    }
 
-        String emoji = blankToNull(req.emoji());
-        String comment = blankToNull(req.comment());
-        if (emoji == null && comment == null) throw new ApiException(ErrorCode.VALIDATION_ERROR);
+    private record Target(SpotVisit visit, Match match) {}
 
-        VisitReaction r = reactionRepository.save(VisitReaction.of(visitId, me.id(), emoji, comment, now()));
-        if (comment != null) {
-            translationService.translateAsync(TranslationTarget.REACTION_COMMENT, r.getId(), comment,
-                    MATE_LANG, TRAVELER_LANG);
+    /** 리액션이 들어 있는 행들 (보통 1개. 이전 버전 기록이면 여러 개이거나 댓글과 같은 행일 수 있다) */
+    private List<VisitReaction> reactionRows(Long visitId) {
+        return reactionRepository.findByVisitIdInOrderByIdAsc(List.of(visitId)).stream()
+                .filter(VisitReaction::isReaction)
+                .toList();
+    }
+
+    /** 리액션만 있는 행은 지우고, 댓글도 있는 행은 리액션 칸만 비워 댓글을 남긴다 */
+    private void removeReaction(VisitReaction r) {
+        if (r.isComment()) {
+            r.clearReaction();
+        } else {
+            reactionRepository.delete(r);
         }
-        notificationPublisher.publish(m.getTravelerId(), NotificationType.REACTION, m.getId());
-        return new ReactionCreated(r.getId());
     }
 
     // ---------- 내부 ----------
@@ -143,9 +193,9 @@ public class VisitService {
         return v == null || v.isBlank() ? null : v.trim();
     }
 
-    private static ReactionView reactionView(VisitReaction r) {
-        return new ReactionView(r.getId(), r.getEmoji(),
-                LocalizedText.of(r.getComment(), r.getCommentTranslated(), MATE_LANG), Times.kst(r.getCreatedAt()));
+    private static CommentView commentView(VisitReaction r) {
+        return new CommentView(r.getId(), LocalizedText.of(r.getComment(), r.getCommentTranslated(), MATE_LANG),
+                Times.kst(r.getCreatedAt()));
     }
 
     // ---------- 요청·응답 ----------
@@ -160,16 +210,41 @@ public class VisitService {
     public record Progress(long visited, Integer required, long total) {}
 
     public record VisitCreated(Long visitId, Long spotId, OffsetDateTime verifiedAt, Progress progress,
-                               boolean chatRequested) {}
+                               boolean chatReady) {}
 
     public record SpotRef(Long spotId, String name) {}
 
-    public record ReactionView(Long reactionId, String emoji, LocalizedText comment, OffsetDateTime createdAt) {}
+    public record CommentView(Long commentId, LocalizedText content, OffsetDateTime createdAt) {}
 
     public record VisitView(Long visitId, SpotRef spot, String photoUrl, LocalizedText review,
-                            OffsetDateTime verifiedAt, List<ReactionView> reactions) {}
+                            OffsetDateTime verifiedAt, String reaction, List<CommentView> comments) {}
 
-    public record ReactionRequest(@Size(max = 20) String emoji, @Size(max = 300) String comment) {}
+    /** 메이트 리액션 3종 (M-23 좋아요·웃음·응원) */
+    public enum ReactionType {
+        LIKE, LAUGH, CHEER;
 
-    public record ReactionCreated(Long reactionId) {}
+        /** LIKE·LAUGH·CHEER 중 하나인지 (이전 버전의 자유 이모지는 목록에서 리액션으로 보여 주지 않는다) */
+        static boolean isValid(String value) {
+            if (value == null) return false;
+            for (ReactionType t : values()) if (t.name().equals(value)) return true;
+            return false;
+        }
+
+        static ReactionType from(String value) {
+            if (value == null || value.isBlank()) throw new ApiException(ErrorCode.VALIDATION_ERROR);
+            try {
+                return valueOf(value.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new ApiException(ErrorCode.VALIDATION_ERROR);
+            }
+        }
+    }
+
+    public record ReactionRequest(String type) {}
+
+    public record ReactionResult(Long visitId, String reaction) {}
+
+    public record CommentRequest(@Size(max = 300) String content) {}
+
+    public record CommentCreated(Long commentId) {}
 }

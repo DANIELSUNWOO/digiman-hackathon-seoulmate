@@ -22,6 +22,18 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     boolean existsByTravelerIdAndMateIdAndStatusIn(UUID travelerId, UUID mateId, Collection<MatchStatus> statuses);
     boolean existsByCourseMapIdAndStatusIn(Long mapId, Collection<MatchStatus> statuses);
 
+    /** USER-06 만난 메이트 수 (같은 사람은 1번) */
+    @Query("select count(distinct m.mateId) from Match m where m.travelerId = :travelerId")
+    long countDistinctMatesOf(@Param("travelerId") UUID travelerId);
+
+    /** USER-06 만난 여행자 수 (같은 사람은 1번) */
+    @Query("select count(distinct m.travelerId) from Match m where m.mateId = :mateId")
+    long countDistinctTravelersOf(@Param("mateId") UUID mateId);
+
+    /** USER-06 내가 인증한 스팟 수 (전체 매칭 합계) */
+    @Query("select count(v) from SpotVisit v, Match m where v.matchId = m.id and m.travelerId = :travelerId")
+    long countVisitsOfTraveler(@Param("travelerId") UUID travelerId);
+
     @Query("select m from Match m where (m.travelerId = :userId or m.mateId = :userId) and m.status in :statuses order by m.id desc")
     List<Match> findMine(@Param("userId") UUID userId, @Param("statuses") Collection<MatchStatus> statuses);
 

@@ -50,7 +50,7 @@ class SecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("mate@test.com"))
                 .andExpect(jsonPath("$.matchCapacity.max").value(10))
-                .andExpect(jsonPath("$.onboarding.verified").value(false));
+                .andExpect(jsonPath("$.onboarding.verified").value(true));     // 메이트는 휴대폰 인증이라 등록 즉시 인증 완료 (디자인 11/26 M-02)
 
         mvc.perform(post("/api/v1/users").with(jwt().jwt(j -> j.subject(sub)))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"country\":\"KR\",\"agreeTerms\":true}"))

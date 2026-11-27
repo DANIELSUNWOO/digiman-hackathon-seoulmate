@@ -1,36 +1,72 @@
-import { Session } from "@supabase/supabase-js";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
+import { AuthFlow, type FlowState } from "./authFlow";
+import { getMe, registerUser } from "./users";
 import { supabase } from "./supabase";
-type AuthState = { session: Session | null; ready: boolean };
-const SessionContext = createContext<AuthState>({
+
+type Context = FlowState & { flow: AuthFlow | null };
+const SessionContext = createContext<Context | null>(null);
+const empty: FlowState = {
+  session: null,
+  ready: true,
+  load: { kind: "loading" },
+  busy: false,
+  notice: null,
+  registrationError: null,
+};
+const serverSnapshot: FlowState = {
   session: null,
   ready: false,
-});
+  load: { kind: "loading" },
+  busy: false,
+  notice: null,
+  registrationError: null,
+};
+const getServerSnapshot = () => serverSnapshot;
+const subscribeEmpty = () => () => {};
+const getEmpty = () => empty;
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    session: null,
-    ready: false,
-  });
+  const flow = useMemo(
+    () =>
+      supabase
+        ? new AuthFlow({
+            auth: supabase.auth,
+            getMe,
+            registerUser,
+            configured: !!process.env.EXPO_PUBLIC_API_BASE_URL,
+          })
+        : null,
+    [],
+  );
+  const state = useSyncExternalStore(
+    flow?.subscribe ?? subscribeEmpty,
+    flow?.snapshot ?? getEmpty,
+    getServerSnapshot,
+  );
   useEffect(() => {
-    if (!supabase) {
-      setState({ session: null, ready: true });
-      return;
-    }
-    let mounted = true;
+    if (!supabase || !flow) return;
+    flow.activate();
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) setState({ session, ready: true });
-    });
+    } = supabase.auth.onAuthStateChange(flow.event);
     return () => {
-      mounted = false;
       subscription.unsubscribe();
+      flow.dispose();
     };
-  }, []);
+  }, [flow]);
   return (
-    <SessionContext.Provider value={state}>{children}</SessionContext.Provider>
+    <SessionContext.Provider value={{ ...state, flow }}>
+      {children}
+    </SessionContext.Provider>
   );
 }
 export function useSession() {
-  return useContext(SessionContext);
+  const value = useContext(SessionContext);
+  if (!value) throw new Error("SessionProvider missing");
+  return value;
 }

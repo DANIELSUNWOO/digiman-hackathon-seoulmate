@@ -3,6 +3,7 @@ package server.match.service;
 import java.util.UUID;
 
 import server.album.repository.AlbumRepository;
+import server.global.common.LocalizedText;
 import server.global.common.Times;
 import server.global.common.UserSummary;
 import server.map.domain.SecretMap;
@@ -48,7 +49,7 @@ public class MatchViewAssembler {
         MatchDtos.Progress progress = null;
         if (m.getCourseMapId() != null) {
             SecretMap map = mapRepository.findById(m.getCourseMapId()).orElse(null);
-            if (map != null) courseMap = new MatchDtos.CourseMap(map.getId(), map.getTitle());
+            if (map != null) courseMap = courseMap(map, viewerId, m);
             progress = progress(m);
         }
         MatchDtos.TripRange trip = tripRepository.findById(m.getTripId())
@@ -61,15 +62,26 @@ public class MatchViewAssembler {
 
     public MatchDtos.MatchDetail detail(Match m, UUID viewerId) {
         MatchDtos.MatchItem i = item(m, viewerId);
-        Boolean partnerAnswer = m.chatAnswerOf(m.partnerOf(viewerId));
-        // 상대가 거절했는지는 알려 주지 않는다 (수락했는지만 true/false)
-        MatchDtos.Chat chat = new MatchDtos.Chat(m.getChatStatus().name(), m.chatAnswerOf(viewerId),
-                Boolean.TRUE.equals(partnerAnswer));
+        // API v1.7: 여행자이고 READY 면 canOpen (메이트는 항상 false)
+        MatchDtos.Chat chat = new MatchDtos.Chat(m.getChatStatus().name(), m.canOpenChat(viewerId));
         Long albumId = albumRepository.findByMatchId(m.getId()).map(a -> a.getId()).orElse(null);
         return new MatchDtos.MatchDetail(i.matchId(), i.status(), i.chatStatus(), i.partner(), i.courseMap(),
                 i.progress(), i.trip(), i.lastVisitAt(), chat, Times.kst(m.getMatchedAt()),
                 Times.kst(m.getCourseSelectedAt()), Times.kst(m.getEndedAt()), albumId,
                 blockedAgainst(m, viewerId).map(b -> !b.hasFeedback()).orElse(false));
+    }
+
+    /**
+     * 코스 지도 이름: 여행자에게는 LocalizedText(원문 한국어 + 일본어 번역), 메이트에게는 한국어 문자열.
+     * 번역 칼럼(secret_maps.title_translated)은 V2 마이그레이션으로 추가했고, 엔티티 매핑은 서버 B(SecretMap)가 채운다.
+     */
+    public MatchDtos.CourseMap courseMap(SecretMap map, UUID viewerId, Match m) {
+        return new MatchDtos.CourseMap(map.getId(), title(map, viewerId, m));
+    }
+
+    public Object title(SecretMap map, UUID viewerId, Match m) {
+        if (!m.isTraveler(viewerId)) return map.getTitle();
+        return LocalizedText.of(map.getTitle(), map.getTitleTranslated(), "ko");
     }
 
     /** API v1.5: 차단당한 쪽에게는 BLOCKED 대신 ENDED (차단 사실을 드러내지 않음) */

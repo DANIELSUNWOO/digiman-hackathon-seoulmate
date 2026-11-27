@@ -13,7 +13,15 @@ import server.map.repository.SecretMapRepository;
 import server.map.repository.SpotRepository;
 import server.match.domain.MatchStatus;
 import server.match.repository.MatchRepository;
+import server.match.domain.CancelReason;
+import server.match.domain.Match;
+import server.match.service.MatchDtos;
 import server.match.service.MatchService;
+import server.notification.domain.Notification;
+import server.notification.domain.NotificationType;
+import server.notification.repository.NotificationRepository;
+import server.user.service.UserStatsService;
+import org.springframework.data.domain.PageRequest;
 import server.trip.domain.Trip;
 import server.trip.repository.TripRepository;
 import server.user.domain.Gender;
@@ -47,13 +55,15 @@ class MatchApplyIntegrationTest {
     @Autowired SecretMapRepository mapRepository;
     @Autowired SpotRepository spotRepository;
     @Autowired MatchRepository matchRepository;
+    @Autowired NotificationRepository notificationRepository;
+    @Autowired UserStatsService userStatsService;
 
     private final LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
     private final LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
 
     private User user(String country, Gender gender, int birthYear) {
-        User u = User.register(UUID.randomUUID(), country, 1, now);
-        String nick = (country + UUID.randomUUID()).substring(0, 12);
+        User u = User.register(UUID.randomUUID(), country, 5, now);
+        String nick = (country + UUID.randomUUID()).substring(0, 8);
         u.registerProfile(nick, gender, birthYear, null, null);
         u.verify();
         return userRepository.save(u);
@@ -67,17 +77,25 @@ class MatchApplyIntegrationTest {
         return t;
     }
 
-    /** 공개 지도(스팟 5곳 + 공개 2곳)가 있는 20대 메이트 */
-    private User mate() {
-        User m = user("KR", Gender.FEMALE, 2001);
-        SecretMap map = mapRepository.save(SecretMap.of(m.getId(), "성수 카페", "조용한 카페", now));
-        for (int i = 0; i < 5; i++) {
+    /** 20대 메이트 */
+    private User mateUser() {
+        return user("KR", Gender.FEMALE, 2001);
+    }
+
+    /** 메이트의 지도. spots 곳, 그중 2곳 공개 (spots ≥ 5 이면 공개 조건 충족) */
+    private Long map(User mate, int spots) {
+        SecretMap map = mapRepository.save(SecretMap.of(mate.getId(), "성수 카페", "조용한 카페", now));
+        for (int i = 0; i < spots; i++) {
             Spot s = Spot.of(map.getId(), "스팟" + i, null, new BigDecimal("37.5447000"), new BigDecimal("127.0582000"),
                     null, null, null, i);
             s.setPreview(i < 2);
             spotRepository.save(s);
         }
-        return m;
+        return map.getId();
+    }
+
+    private Long publicMap() {
+        return map(mateUser(), 5);
     }
 
     private static AuthUser auth(User u) {
@@ -88,67 +106,102 @@ class MatchApplyIntegrationTest {
         return ((ApiException) t).getErrorCode();
     }
 
-    @Test
-    void 매칭_성공하면_칸을_1개_쓴다() {
-        User t = traveler(), m = mate();
-        var res = matchService.apply(auth(t), m.getId());
-        assertThat(res.status()).isEqualTo("MATCHED");
-        assertThat(res.slots().used()).isEqualTo(1);
+    private List<NotificationType> notificationsOf(User u) {
+        return notificationRepository.findByUserIdOrderByIdDesc(u.getId(), PageRequest.of(0, 50)).stream()
+                .map(Notification::getType).toList();
     }
 
     @Test
-    void 빈_칸이_없으면_NO_FREE_SLOT() {
+    void 지도를_고르면_바로_매칭되고_코스가_확정된다() {
+        User t = traveler(), m = mateUser();
+        Long mapId = map(m, 7);
+        var res = matchService.apply(auth(t), mapId);
+        assertThat(res.status()).isEqualTo("ON_COURSE");
+        assertThat(res.chatStatus()).isEqualTo("LOCKED");
+        assertThat(res.courseMap().mapId()).isEqualTo(mapId);
+        assertThat(res.progress().required()).isEqualTo(3);          // 7곳 → 내림 3곳
+        assertThat(res.progress().total()).isEqualTo(7);
+        assertThat(res.slots().used()).isEqualTo(1);
+        assertThat(res.slots().total()).isEqualTo(5);
+
+        Match saved = matchRepository.findById(res.matchId()).orElseThrow();
+        assertThat(saved.getCourseMapId()).isEqualTo(mapId);
+        assertThat(saved.getRequiredVisits()).isEqualTo(3);
+        assertThat(notificationsOf(m)).containsExactly(NotificationType.MATCHED);
+    }
+
+    @Test
+    void 같은_메이트의_다른_지도도_고를_수_있다() {
+        User t = traveler(), m = mateUser();
+        matchService.apply(auth(t), map(m, 5));
+        var second = matchService.apply(auth(t), map(m, 6));
+        assertThat(second.slots().used()).isEqualTo(2);
+    }
+
+    @Test
+    void 같은_지도를_두번_고르면_MAP_ALREADY_SELECTED() {
         User t = traveler();
-        matchService.apply(auth(t), mate().getId());
-        UUID second = mate().getId();
-        assertThatThrownBy(() -> matchService.apply(auth(t), second))
+        Long mapId = publicMap();
+        matchService.apply(auth(t), mapId);
+        assertThatThrownBy(() -> matchService.apply(auth(t), mapId))
+                .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.MAP_ALREADY_SELECTED));
+    }
+
+    @Test
+    void 다섯_칸을_다_쓰면_NO_FREE_SLOT() {
+        User t = traveler();
+        for (int i = 0; i < 5; i++) matchService.apply(auth(t), publicMap());
+        Long sixth = publicMap();
+        assertThatThrownBy(() -> matchService.apply(auth(t), sixth))
                 .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.NO_FREE_SLOT));
     }
 
     @Test
-    void 공개_지도가_없는_메이트는_MATE_NOT_AVAILABLE() {
+    void 공개_조건을_못_채운_지도는_MAP_NOT_AVAILABLE() {
         User t = traveler();
-        User noMap = user("KR", Gender.MALE, 1999);
-        assertThatThrownBy(() -> matchService.apply(auth(t), noMap.getId()))
-                .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.MATE_NOT_AVAILABLE));
+        Long notPublic = map(mateUser(), 4);
+        assertThatThrownBy(() -> matchService.apply(auth(t), notPublic))
+                .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.MAP_NOT_AVAILABLE));
     }
 
     @Test
-    void 연령대_조건에_안_맞으면_MATE_NOT_AVAILABLE() {
+    void 없는_지도는_MAP_NOT_FOUND() {
+        User t = traveler();
+        assertThatThrownBy(() -> matchService.apply(auth(t), 999_999L))
+                .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.MAP_NOT_FOUND));
+    }
+
+    @Test
+    void 연령대_조건에_안_맞는_메이트의_지도는_MAP_NOT_AVAILABLE() {
         User t = traveler();                                   // 20·30대만 원함
-        User older = user("KR", Gender.FEMALE, 1980);          // 40대
-        SecretMap map = mapRepository.save(SecretMap.of(older.getId(), "을지로", null, now));
-        for (int i = 0; i < 5; i++) {
-            Spot s = Spot.of(map.getId(), "s" + i, null, BigDecimal.ONE, BigDecimal.ONE, null, null, null, i);
-            s.setPreview(i < 2);
-            spotRepository.save(s);
-        }
-        assertThatThrownBy(() -> matchService.apply(auth(t), older.getId()))
-                .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.MATE_NOT_AVAILABLE));
+        Long olderMap = map(user("KR", Gender.FEMALE, 1980), 5);   // 40대
+        assertThatThrownBy(() -> matchService.apply(auth(t), olderMap))
+                .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.MAP_NOT_AVAILABLE));
     }
 
     @Test
     void 일정이_없으면_TRIP_REQUIRED() {
         User t = user("JP", Gender.FEMALE, 2000);
         preferenceRepository.save(MatchPreference.of(t.getId(), GenderPref.ANY, List.of(20)));
-        UUID mateId = mate().getId();
-        assertThatThrownBy(() -> matchService.apply(auth(t), mateId))
+        Long mapId = publicMap();
+        assertThatThrownBy(() -> matchService.apply(auth(t), mapId))
                 .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.TRIP_REQUIRED));
     }
 
     @Test
     void 메이트_정원_10건이_차면_MATE_FULL() {
-        User m = mate();
-        for (int i = 0; i < 10; i++) matchService.apply(auth(traveler()), m.getId());
+        Long mapId = publicMap();
+        for (int i = 0; i < 10; i++) matchService.apply(auth(traveler()), mapId);
         User eleventh = traveler();
-        assertThatThrownBy(() -> matchService.apply(auth(eleventh), m.getId()))
+        assertThatThrownBy(() -> matchService.apply(auth(eleventh), mapId))
                 .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.MATE_FULL));
     }
 
     @Test
-    void 정원_마지막_1자리에_동시에_5명이_신청해도_1명만_성공() throws Exception {
-        User m = mate();
-        for (int i = 0; i < 9; i++) matchService.apply(auth(traveler()), m.getId());
+    void 정원_마지막_1자리에_동시에_5명이_고르면_1명만_성공() throws Exception {
+        User m = mateUser();
+        Long mapId = map(m, 5);
+        for (int i = 0; i < 9; i++) matchService.apply(auth(traveler()), mapId);
         List<User> travelers = new ArrayList<>();
         for (int i = 0; i < 5; i++) travelers.add(traveler());
 
@@ -161,7 +214,7 @@ class MatchApplyIntegrationTest {
             futures.add(pool.submit(() -> {
                 start.await();
                 try {
-                    matchService.apply(auth(t), m.getId());
+                    matchService.apply(auth(t), mapId);
                     success.incrementAndGet();
                 } catch (ApiException e) {
                     if (e.getErrorCode() == ErrorCode.MATE_FULL) full.incrementAndGet();
@@ -179,13 +232,57 @@ class MatchApplyIntegrationTest {
     }
 
     @Test
-    void 취소하면_칸이_돌아오고_메이트는_취소할_수_없다() {
-        User t = traveler(), m = mate();
-        Long matchId = matchService.apply(auth(t), m.getId()).matchId();
-        assertThatThrownBy(() -> matchService.cancel(auth(m), matchId))
-                .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.MATE_CANNOT_CANCEL));
-        var canceled = matchService.cancel(auth(t), matchId);
-        assertThat(canceled.status()).isEqualTo("CANCELED");
-        assertThat(canceled.slots().used()).isZero();
+    void 여행자가_끊으면_칸이_돌아오고_사유가_저장된다() {
+        User t = traveler(), m = mateUser();
+        Long matchId = matchService.apply(auth(t), map(m, 5)).matchId();
+        var res = matchService.cancel(auth(t), matchId, new MatchDtos.CancelRequest(CancelReason.PLAN_CHANGED, null));
+        assertThat(res.status()).isEqualTo("CANCELED");
+        assertThat(res.slots().used()).isZero();
+        Match saved = matchRepository.findById(matchId).orElseThrow();
+        assertThat(saved.getCancelReason()).isEqualTo(CancelReason.PLAN_CHANGED);
+        assertThat(saved.getCanceledBy()).isEqualTo(t.getId());
+        assertThat(notificationsOf(m)).contains(NotificationType.CANCELED);
+    }
+
+    @Test
+    void 메이트도_끊을_수_있고_응답에_칸은_없다() {
+        User t = traveler(), m = mateUser();
+        Long matchId = matchService.apply(auth(t), map(m, 5)).matchId();
+        var res = matchService.cancel(auth(m), matchId, null);          // 사유 생략
+        assertThat(res.status()).isEqualTo("CANCELED");
+        assertThat(res.slots()).isNull();
+        assertThat(notificationsOf(t)).contains(NotificationType.CANCELED);
+        assertThatThrownBy(() -> matchService.cancel(auth(t), matchId, null))
+                .satisfies(e -> assertThat(codeOf(e)).isEqualTo(ErrorCode.MATCH_NOT_ACTIVE));
+    }
+
+    @Test
+    void 메이트는_지도별로_매칭을_볼_수_있다() {
+        User m = mateUser();
+        Long mapA = map(m, 5), mapB = map(m, 5);
+        matchService.apply(auth(traveler()), mapA);
+        matchService.apply(auth(traveler()), mapA);
+        matchService.apply(auth(traveler()), mapB);
+        assertThat(matchService.list(auth(m), null, mapA)).hasSize(2);
+        assertThat(matchService.list(auth(m), "active", mapB)).hasSize(1);
+        assertThat(matchService.list(auth(m), null, null)).hasSize(3);
+    }
+
+    @Test
+    void 활동_요약은_역할별로_다르다() {
+        User t = traveler(), m = mateUser();
+        matchService.apply(auth(t), map(m, 5));
+        matchService.apply(auth(t), map(m, 5));                          // 같은 메이트는 1명
+        matchService.apply(auth(t), publicMap());
+
+        var travelerStats = (UserStatsService.TravelerStats) userStatsService.stats(auth(t));
+        assertThat(travelerStats.tripDay()).isEqualTo(1);                // 여행 시작일 = 오늘
+        assertThat(travelerStats.matesMet()).isEqualTo(2);
+        assertThat(travelerStats.visitedSpots()).isZero();
+
+        var mateStats = (UserStatsService.MateStats) userStatsService.stats(auth(m));
+        assertThat(mateStats.activeDays()).isEqualTo(1);
+        assertThat(mateStats.travelersMet()).isEqualTo(1);
+        assertThat(mateStats.completedMaps()).isEqualTo(2);
     }
 }

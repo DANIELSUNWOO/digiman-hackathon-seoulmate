@@ -14,6 +14,7 @@ import server.global.security.AuthUser;
 import server.global.security.TokenUser;
 import server.user.service.UserDtos;
 import server.user.service.UserService;
+import server.user.service.UserStatsService;
 
 import java.util.Map;
 
@@ -24,6 +25,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
+    private final UserStatsService userStatsService;
 
     @Operation(summary = "AUTH-01 회원 등록 (Supabase 가입 직후 국적·약관 저장)")
     @PostMapping
@@ -75,5 +77,11 @@ public class UserController {
     public UserDtos.PreferenceDto savePreference(AuthUser me, @Valid @RequestBody UserDtos.PreferenceDto req) {
         Guards.requireTraveler(me);
         return userService.savePreference(me, req);
+    }
+
+    @Operation(summary = "USER-06 마이페이지 활동 요약 3칸 (여행자·메이트 값이 다름)")
+    @GetMapping("/me/stats")
+    public UserStatsService.Stats stats(AuthUser me) {
+        return userStatsService.stats(me);
     }
 }

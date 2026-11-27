@@ -1,1 +1,11 @@
+// Gradle 플러그인(Spring Boot 등)도 미러에서 먼저 받는다.
+// 플러그인 포털은 Spring 라이브러리를 Maven Central 로 넘기는데, Render 빌드 서버에서는 Central 이 429 로 막힐 때가 있다
+pluginManagement {
+	repositories {
+		maven { url = 'https://maven-central.storage-download.googleapis.com/maven2/' }
+		maven { url = 'https://maven.aliyun.com/repository/public' }
+		gradlePluginPortal()
+	}
+}
+
 rootProject.name = 'server'

@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from "react";
 import { Button, Input, Label } from "../../ui";
 import type { ViewerLang } from "../translation";
-import { errorText } from "./model";
+import { errorText } from "./errors";
 import { strings } from "./strings";
 import { useSending } from "./useSending";
 

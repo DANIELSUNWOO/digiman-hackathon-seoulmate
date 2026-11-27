@@ -29,7 +29,7 @@ export function VisitCard({
   onReport,
 }: VisitCardProps): ReactElement {
   return (
-    // 공통 Card는 버튼이라 안의 "원문 보기"를 누를 수 없게 될 수 있어 View를 쓴다.
+    // 안에 "원문 보기"와 버튼들이 있어 카드 자체는 누르는 요소가 아니어야 한다.
     <View style={styles.card}>
       <VisitPhoto key={visit.photoUrl} visit={visit} lang={lang} />
       <Label weight="bold" language="ko">

@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { theme } from "../../theme";
 import { Chip, Label } from "../../ui";
 import type { ViewerLang } from "../translation";
-import { errorText } from "./model";
+import { errorText } from "./errors";
 import { strings } from "./strings";
 import { REACTION_TYPES, type ReactionType } from "./types";
 import { useSending } from "./useSending";

@@ -12,6 +12,14 @@ export type VisitsState =
   | { status: "error"; error: unknown }
   | { status: "ready"; visits: VisitRecord[]; refreshError: unknown };
 
+export interface Visits {
+  state: VisitsState;
+  retry: () => void;
+  /** 쓰기 요청은 이 함수로 감싸 조회와 엇갈리지 않게 한다. */
+  write: (request: () => Promise<void>) => Promise<void>;
+  updateVisit: (visitId: number, changes: Partial<VisitRecord>) => void;
+}
+
 /** 이미 보고 있던 목록은 에러 화면으로 바꾸지 않는다. */
 function withFailure(previous: VisitsState, error: unknown): VisitsState {
   return previous.status === "ready"
@@ -57,7 +65,7 @@ function useWriteGate() {
 }
 
 /** VISIT-02. 화면이 보이는 동안만 조회한다. api는 참조가 고정돼 있어야 한다. */
-export function useVisits(api: VisitsApi, matchId: number) {
+export function useVisits(api: VisitsApi, matchId: number): Visits {
   const [state, setState] = useState<VisitsState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const { version, writing, refreshRef, write } = useWriteGate();

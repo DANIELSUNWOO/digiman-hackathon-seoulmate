@@ -10,7 +10,7 @@ import { theme } from "../../theme";
 import { Button, Label, Screen } from "../../ui";
 import type { ViewerLang } from "../translation";
 import { visitsApi, type VisitsApi } from "./api";
-import { errorText } from "./model";
+import { errorText } from "./errors";
 import { strings } from "./strings";
 import type { ReportTarget, VisitRecord } from "./types";
 import { useVisitActions, type VisitActions } from "./useVisitActions";

@@ -1,14 +1,20 @@
 import { useRef, useState } from "react";
 
+export interface Sending {
+  sending: boolean;
+  error: unknown;
+  /** 성공하면 true. 실패는 error에 담는다. */
+  send: (task: () => Promise<void>) => Promise<boolean>;
+}
+
 /** 한 번에 하나만 보낸다. 보내는 중에 또 누르면 무시한다. */
-export function useSending() {
+export function useSending(): Sending {
   // state는 다음 렌더에야 바뀌어 연속으로 누르면 두 번 보낼 수 있다.
   const busy = useRef(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
-  /** 성공하면 true. 실패는 error에 담는다. */
-  const send = async (task: () => Promise<void>): Promise<boolean> => {
+  const send: Sending["send"] = async (task) => {
     if (busy.current) return false;
     busy.current = true;
     setSending(true);

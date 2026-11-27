@@ -1,4 +1,4 @@
-# 서울메이트 ERD v2.7 (11/27, 요구사항정의서 v3.5 · API 명세서 v1.9 · DB 마이그레이션 V1~V5 기준)
+# 서울메이트 ERD v2.7 (11/27, 요구사항정의서 v3.5 · API 명세서 v1.9 · DB 마이그레이션 V1~V6 기준)
 
 > Supabase Postgres 기준. 테이블 17개. 로그인 정보(이메일·비밀번호)는 Supabase Auth(auth.users)가 관리하고, 이 문서의 USERS는 서비스용 회원 정보다.
 
@@ -7,13 +7,14 @@
 
 ---
 
-## 0-D. v2.6 → v2.7 변경 (디자이너 최종본 11/26, V4 · V5 마이그레이션)
+## 0-D. v2.6 → v2.7 변경 (디자이너 최종본 11/26, V4 ~ V6 마이그레이션)
 
 | 변경 | 내용 |
 | --- | --- |
 | TAGS 데이터 교체 (V4) | 분류 11개(CAFE · FOOD · BEAUTY · SHOP · WALK · CULTURE · OSHI_KPOP · OSHI_DRAMA · OSHI_ANIME · OSHI_BASEBALL · AREA) + 항목 63개 + 세부 87개. 테이블 구조는 그대로. 예전 선택(USER_TAGS)은 지워지고 시연 메이트 취향은 다시 붙인다 |
 | REVIEWS.content_translated 추가 (V5) | 상호 후기 번역 |
 | idx_reviews_reviewee 추가 (V5) | 받은 후기 모음(REVIEW-03) 최근 순 조회 |
+| 메이트 verify_status 일괄 VERIFIED (V6, 데이터만) | 메이트는 휴대폰 본인인증으로 가입하고 여권 단계가 없다. 회원 등록 때 바로 VERIFIED |
 
 ## 0-C. v2.5 → v2.6 변경 (API v1.7 · 화면 명세 v9 반영, V2 · V3 마이그레이션)
 

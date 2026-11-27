@@ -14,6 +14,8 @@ export function errorText(
   const serverCode = error.serverError?.code;
   if (serverCode === "NOT_MATCH_MEMBER" || serverCode === "MATCH_NOT_FOUND")
     return text.errorForbidden;
+  if (serverCode === "MATCH_NOT_ACTIVE") return text.errorBlocked;
+  if (serverCode === "VISIT_NOT_FOUND") return text.errorMissing;
   return fallback;
 }
 

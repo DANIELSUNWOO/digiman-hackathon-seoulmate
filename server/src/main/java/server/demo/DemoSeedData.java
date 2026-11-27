@@ -18,6 +18,21 @@ final class DemoSeedData {
     private DemoSeedData() {
     }
 
+    /** 지난 여행자 닉네임 (받은 후기 모음 C-02a 에 그대로 보인다. 디자인 시안 이름) */
+    static final List<String> PAST_TRAVELER_NAMES = List.of("ゆき", "はると", "さくら", "みお", "そうた", "あおい");
+
+    /** 지난 여행마다 여행자가 메이트에게 남긴 후기 (C-02a 시연용, 차례대로 돌려 쓴다). 일본어 원문 + 한국어 번역 */
+    static final List<ReviewSeed> REVIEWS = List.of(
+            new ReviewSeed(5, "ガイドブックにないソウルを楽しめました。", "가이드북에 없는 서울을 즐길 수 있었어요."),
+            new ReviewSeed(5, "地図の説明が親切で、一人でも迷いませんでした。", "지도 설명이 친절해서 혼자서도 헤매지 않았어요."),
+            new ReviewSeed(5, "すぐにリアクションをくれて、一人旅でも心強かったです。", "리액션을 바로 남겨 줘서 혼자 여행인데도 든든했어요."),
+            new ReviewSeed(4, "路地が少し難しかったけど、そのぶん地元らしかったです。", "골목이 조금 어려웠지만, 그래서 더 현지 같았어요."),
+            new ReviewSeed(5, "次にソウルに来たら、また別の地図で歩きたいです。", "다음에 서울에 오면 또 다른 지도로 걷고 싶어요."),
+            new ReviewSeed(4, "写真を撮りたくなる場所ばかりでした。", "사진 찍고 싶은 곳뿐이었어요."));
+
+    record ReviewSeed(int rating, String ja, String ko) {
+    }
+
     record MateSeed(UUID id, String nickname, Gender gender, int birthYear, String bio,
                     List<String> tagNamesKo, List<MapSeed> maps) {
     }

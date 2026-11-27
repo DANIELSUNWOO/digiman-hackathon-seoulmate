@@ -1,6 +1,7 @@
 package server.translation;
 
 import lombok.RequiredArgsConstructor;
+import server.album.repository.ReviewRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import server.global.event.TranslationTarget;
@@ -27,6 +28,7 @@ public class TranslationWriter {
     private final SpotRepository spotRepository;
     private final SpotVisitRepository visitRepository;
     private final VisitReactionRepository reactionRepository;
+    private final ReviewRepository reviewRepository;
     private final TranslationQueries queries;
 
     /** @return 채웠으면 true (대상이 없거나 원문이 바뀌었으면 false) */
@@ -52,6 +54,9 @@ public class TranslationWriter {
                     .filter(r -> original.equals(r.getComment()))
                     .map(r -> { r.fillTranslation(translated); return true; }).orElse(false);
             case CHAT_MESSAGE -> queries.fillChatTranslation(id, translated) > 0;
+            case REVIEW_CONTENT -> reviewRepository.findById(id)
+                    .filter(r -> original.equals(r.getContent()))
+                    .map(r -> { r.fillTranslation(translated); return true; }).orElse(false);
         };
     }
 }

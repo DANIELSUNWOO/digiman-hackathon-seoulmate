@@ -87,6 +87,9 @@ public enum ErrorCode {
 
     // 앨범·후기 (서버 B)
     ALBUM_NOT_FOUND(HttpStatus.NOT_FOUND, "앨범이 아직 없습니다."),
+
+    // 장소 검색 (서버 B)
+    PLACE_SEARCH_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "장소 검색을 지금 쓸 수 없습니다. 잠시 후 다시 시도해 주세요."),
     ALREADY_REVIEWED(HttpStatus.CONFLICT, "이미 후기를 남겼습니다.");
 
     private final HttpStatus status;

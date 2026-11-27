@@ -41,6 +41,11 @@ seoulmate:
     model: ${LLM_MODEL:gpt-5.4-nano}
     base-url: https://api.openai.com/v1
     timeout-seconds: 20
+  place-search:                 # 장소 검색 PLACE-01 (서버 B). 키가 비어 있으면 503 PLACE_SEARCH_UNAVAILABLE
+    provider: ${NAVER_SEARCH_PROVIDER:hub}   # hub = NAVER API HUB(네이버 클라우드), developers = 예전 네이버 개발자센터 키
+    client-id: ${NAVER_SEARCH_CLIENT_ID:}
+    client-secret: ${NAVER_SEARCH_CLIENT_SECRET:}
+    timeout-seconds: 5
   supabase:
     issuer: ${SUPABASE_JWT_ISSUER}
     jwks-url: ${SUPABASE_JWKS_URL}

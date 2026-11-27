@@ -50,7 +50,7 @@
 |---|---|
 | M-02 가입 | `POST /users {country: "KR"}` 만 부르면 바로 `VERIFIED` (휴대폰 인증 화면은 시연용, 여권 API 안 부름) |
 | M-03·04 프로필·취향 | 여행자와 같음. `AREA` 는 "잘 아는 동네" |
-| M-10~14 지도 만들기 | `POST /maps` → `POST /maps/{id}/spots` (5곳 이상) → `PUT /maps/{id}/previews` (정확히 2곳) |
+| M-10~14 지도 만들기 | `POST /maps` → 장소 검색 `GET /places/search?query=` → `POST /maps/{id}/spots` (5곳 이상) → `PUT /maps/{id}/previews` (정확히 2곳) |
 | M-20 홈 | `GET /matches?state=active` → 개수가 "함께 여행 중 n / 10" |
 | M-15 지도별 대화 목록 | **`GET /matches?mapId={mapId}`** (`chatStatus` 가 OPEN 이 아니면 잠금 표시) |
 | M-22·23 여행자 상세·방문 기록 | `GET /matches/{id}` · `GET /matches/{id}/visits` |

@@ -13,5 +13,8 @@ seoulmate:
   supabase:
     issuer: https://test-project.supabase.co/auth/v1
     jwks-url: https://test-project.supabase.co/auth/v1/.well-known/jwks.json
+  place-search:
+    client-id: ""              # 테스트에서는 .env 에 키가 있어도 네이버를 부르지 않는다
+    client-secret: ""
   llm:
     api-key: ""                # 테스트에서는 .env 에 키가 있어도 실제 번역을 부르지 않는다

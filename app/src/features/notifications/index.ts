@@ -1,5 +1,9 @@
 export { destinationFor } from "./model";
 export {
+  NotificationBell,
+  type NotificationBellProps,
+} from "./NotificationBell";
+export {
   NotificationsScreen,
   type NotificationsScreenProps,
 } from "./NotificationsScreen";

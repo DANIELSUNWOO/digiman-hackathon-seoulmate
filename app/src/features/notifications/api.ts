@@ -4,6 +4,8 @@ import type { NotificationPage } from "./types";
 export interface NotificationsApi {
   /** NOTI-01. cursor가 null이면 첫 페이지 */
   list: (cursor: number | null) => Promise<NotificationPage>;
+  /** NOTI-02 */
+  unreadCount: () => Promise<number>;
   /** NOTI-03 */
   markRead: (notificationId: number) => Promise<void>;
   /** NOTI-04 */
@@ -16,6 +18,10 @@ export const notificationsApi: NotificationsApi = {
   list: (cursor) =>
     apiRequest<NotificationPage>(
       `notifications?size=${PAGE_SIZE}${cursor === null ? "" : `&cursor=${cursor}`}`,
+    ),
+  unreadCount: () =>
+    apiRequest<{ count: number }>("notifications/unread-count").then(
+      ({ count }) => count,
     ),
   markRead: (notificationId) =>
     apiRequest<void>(`notifications/${notificationId}/read`, {

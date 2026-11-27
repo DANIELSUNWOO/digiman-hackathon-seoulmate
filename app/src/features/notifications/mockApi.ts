@@ -97,6 +97,10 @@ export function createMockNotificationsApi(
             : null,
       };
     },
+    unreadCount: async () => {
+      if (scenario === "error") throw networkError();
+      return items.filter((item) => !item.isRead).length;
+    },
     markRead: async (notificationId) => {
       failAction();
       items = items.map((item) =>

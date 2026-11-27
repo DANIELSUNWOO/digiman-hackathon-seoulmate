@@ -9,6 +9,7 @@ import {
 import type { NotificationsApi } from "./api";
 import { appendPage, withAllRead, withReadFlag } from "./model";
 import type { NotificationItem, NotificationPage } from "./types";
+import { notifyUnreadChange } from "./unreadEvents";
 
 export type FeedState =
   | { status: "loading" }
@@ -129,7 +130,7 @@ function useReadActions(
     if (isRead) return;
     setActionError(null);
     updatePage(setState, (page) => withReadFlag(page, notificationId, true));
-    api.markRead(notificationId).catch((error: unknown) => {
+    api.markRead(notificationId).then(notifyUnreadChange, (error: unknown) => {
       updatePage(setState, (page) => withReadFlag(page, notificationId, false));
       setActionError(error);
     });
@@ -141,6 +142,7 @@ function useReadActions(
     try {
       await api.markAllRead();
       updatePage(setState, withAllRead);
+      notifyUnreadChange();
     } catch (error: unknown) {
       setActionError(error);
     } finally {

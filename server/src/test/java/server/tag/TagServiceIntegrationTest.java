@@ -82,13 +82,14 @@ class TagServiceIntegrationTest {
         TagTree.Child local = item("FOOD", "로컬 식당");
         TagTree.Child bts = item("OSHI_KPOP", "BTS");
         List<Long> picks = new java.util.ArrayList<>();
-        category("FOOD").children().forEach(c -> picks.add(c.tagId()));          // 한 분류에서 전부 (예전엔 2개까지)
+        tagService.tree("ko").forEach(c -> c.children().forEach(i -> picks.add(i.tagId())));   // 모든 항목 63개 (동네 포함)
         local.children().forEach(d -> picks.add(d.tagId()));                    // 3단계 세부
         picks.add(bts.children().get(0).tagId());                               // 推し 멤버
-        picks.add(item("AREA", "연남").tagId());                                 // 「行ってみたい街」
 
         var saved = tagService.replaceMine(user("JP"), "ja", picks);
-        assertThat(saved).hasSize(picks.size()).hasSizeGreaterThan(14);
+        assertThat(saved).hasSize(picks.size()).hasSizeGreaterThan(14);          // 예전 전체 상한 14개
+        assertThat(saved).filteredOn(t -> "FOOD".equals(t.category()) && t.depth() == 2)
+                .hasSizeGreaterThan(2);                                          // 예전 분류당 2개
         assertThat(saved).anyMatch(t -> t.depth() == 3 && t.parentId().equals(local.tagId()));
         assertThat(saved).anyMatch(t -> "AREA".equals(t.category()));
     }

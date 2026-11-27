@@ -39,8 +39,20 @@ import {
 } from "../../src/features/onboarding/validation";
 import { useSession } from "../../src/session";
 import { theme } from "../../src/theme";
-import { Button, Input, Label, Screen } from "../../src/ui";
+import {
+  AppBar,
+  Button,
+  ErrorNotice,
+  Input,
+  Label,
+  ProgressTracker,
+  Screen,
+  ScreenFooter,
+  TextLink,
+} from "../../src/ui";
 import { nextStep, onboardingRouteFor } from "../../src/users";
+
+const TRAVELER_STEPS = ["本人確認", "基本情報", "好み", "条件", "日程"];
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -337,26 +349,40 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <Screen>
+    <Screen contentStyle={styles.content}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboard}
       >
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.backLabel}
-            disabled={busy}
-            onPress={handleBack}
-            style={styles.backButton}
-          >
-            <CaretLeft size={theme.size.icon} color={theme.color.text} />
-          </Pressable>
-          <Text style={[styles.headerTitle, { fontFamily: boldFont }]}>
-            {copy.headerTitle}
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        {ko ? (
+          <AppBar
+            title={copy.headerTitle}
+            language={language}
+            backLabel={copy.backLabel}
+            backDisabled={busy}
+            onBack={handleBack}
+          />
+        ) : (
+          <View style={styles.onboardingTop}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={copy.backLabel}
+              disabled={busy}
+              onPress={handleBack}
+              style={styles.backButton}
+            >
+              <CaretLeft
+                size={theme.size.icon}
+                color={theme.color.labelNormal}
+              />
+            </Pressable>
+            <ProgressTracker
+              steps={TRAVELER_STEPS}
+              currentIndex={1}
+              language="ja"
+            />
+          </View>
+        )}
 
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrap}>
@@ -368,7 +394,7 @@ export default function ProfileScreen() {
               />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <User size={34} color={theme.color.muted} />
+                <User size={34} color={theme.color.brandDeep} />
               </View>
             )}
             <Pressable
@@ -380,7 +406,7 @@ export default function ProfileScreen() {
             >
               <Camera
                 size={theme.size.iconInline}
-                color={theme.color.text}
+                color={theme.color.surface}
                 weight="fill"
               />
             </Pressable>
@@ -421,7 +447,7 @@ export default function ProfileScreen() {
                 <Text
                   style={[
                     styles.photoActionLabel,
-                    { fontFamily: mediumFont, color: theme.color.dangerInk },
+                    { fontFamily: mediumFont, color: theme.color.dangerPress },
                   ]}
                 >
                   {copy.removePhoto}
@@ -429,214 +455,222 @@ export default function ProfileScreen() {
               </Pressable>
             )}
           </View>
-          <Text style={[styles.hintText, { fontFamily: bodyFont }]}>
-            {localPhoto ? copy.photoSelectedHint : copy.photoOptionalHint}
-          </Text>
-          {!!photoError && (
+          {photoError ? (
             <Text
               accessibilityLiveRegion="polite"
-              style={[styles.errorText, { fontFamily: bodyFont }]}
+              style={[styles.inlineErrorText, { fontFamily: mediumFont }]}
             >
               {photoError}
             </Text>
-          )}
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Label language={language} weight="bold">
-            {copy.nicknameLabel}
-          </Label>
-          <Input
-            language={language}
-            accessibilityLabel={copy.nicknameLabel}
-            placeholder={copy.nicknamePlaceholder}
-            value={nickname}
-            onChangeText={updateNickname}
-            maxLength={NICKNAME_MAX}
-            editable={!locked}
-          />
-          <View style={styles.counterRow}>
-            <Text style={[styles.hintText, { fontFamily: bodyFont, flex: 1 }]}>
-              {copy.nicknameHint}
-            </Text>
-            <Text style={[styles.counterText, { fontFamily: boldFont }]}>
-              {countChars(nickname)} / {NICKNAME_MAX}
-            </Text>
-          </View>
-          {fieldErrors.nickname && (
-            <Text
-              accessibilityLiveRegion="polite"
-              style={[styles.errorText, { fontFamily: bodyFont }]}
-            >
-              {fieldIssueMessage(fieldErrors.nickname, ko)}
+          ) : (
+            <Text style={[styles.hintText, { fontFamily: bodyFont }]}>
+              {localPhoto ? copy.photoSelectedHint : copy.photoOptionalHint}
             </Text>
           )}
         </View>
 
-        <View style={styles.fieldGroup}>
-          <Label language={language} weight="bold">
-            {copy.genderLabel}
-          </Label>
-          <View style={styles.segmentTrack}>
-            {genderOptions.map((option) => {
-              const selected = gender === option.key;
-              return (
-                <Pressable
-                  key={option.key}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected, disabled: locked }}
-                  disabled={locked}
-                  onPress={() => updateGender(option.key)}
+        <View style={styles.fieldsWrap}>
+          <View style={styles.fieldGroup}>
+            <Label language={language} variant="label" tone="neutral">
+              {copy.nicknameLabel}
+            </Label>
+            <Input
+              language={language}
+              accessibilityLabel={copy.nicknameLabel}
+              placeholder={copy.nicknamePlaceholder}
+              value={nickname}
+              onChangeText={updateNickname}
+              maxLength={NICKNAME_MAX}
+              editable={!locked}
+              error={!!fieldErrors.nickname}
+            />
+            <View style={styles.counterRow}>
+              {fieldErrors.nickname ? (
+                <Text
+                  accessibilityLiveRegion="polite"
                   style={[
-                    styles.segmentButton,
-                    selected && styles.segmentButtonSelected,
+                    styles.inlineErrorText,
+                    { fontFamily: mediumFont, flex: 1 },
                   ]}
                 >
-                  <Text
-                    numberOfLines={1}
+                  {fieldIssueMessage(fieldErrors.nickname, ko)}
+                </Text>
+              ) : (
+                <Text
+                  style={[styles.hintText, { fontFamily: bodyFont, flex: 1 }]}
+                >
+                  {copy.nicknameHint}
+                </Text>
+              )}
+              <Text style={[styles.counterText, { fontFamily: bodyFont }]}>
+                {countChars(nickname)} / {NICKNAME_MAX}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Label language={language} variant="label" tone="neutral">
+              {copy.genderLabel}
+            </Label>
+            <View style={styles.segmentTrack}>
+              {genderOptions.map((option) => {
+                const selected = gender === option.key;
+                return (
+                  <Pressable
+                    key={option.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected, disabled: locked }}
+                    disabled={locked}
+                    onPress={() => updateGender(option.key)}
                     style={[
-                      styles.segmentLabel,
-                      { fontFamily: selected ? boldFont : bodyFont },
-                      selected && { color: theme.color.text },
+                      styles.segmentButton,
+                      selected && styles.segmentButtonSelected,
                     ]}
                   >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.segmentLabel,
+                        { fontFamily: selected ? boldFont : bodyFont },
+                        selected && styles.segmentLabelSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {fieldErrors.gender && (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[styles.inlineErrorText, { fontFamily: mediumFont }]}
+              >
+                {fieldIssueMessage(fieldErrors.gender, ko)}
+              </Text>
+            )}
           </View>
-          {fieldErrors.gender && (
-            <Text
-              accessibilityLiveRegion="polite"
-              style={[styles.errorText, { fontFamily: bodyFont }]}
-            >
-              {fieldIssueMessage(fieldErrors.gender, ko)}
-            </Text>
-          )}
-        </View>
 
-        <View style={styles.fieldGroup}>
-          <Label language={language} weight="bold">
-            {copy.birthYearLabel}
-          </Label>
-          <Input
-            language={language}
-            accessibilityLabel={copy.birthYearLabel}
-            placeholder={copy.birthYearPlaceholder}
-            value={birthYear}
-            onChangeText={updateBirthYear}
-            keyboardType="number-pad"
-            maxLength={4}
-            editable={!locked}
-          />
-          <Text style={[styles.hintText, { fontFamily: bodyFont }]}>
-            {copy.birthYearHint}
-          </Text>
-          {fieldErrors.birthYear && (
-            <Text
-              accessibilityLiveRegion="polite"
-              style={[styles.errorText, { fontFamily: bodyFont }]}
-            >
-              {fieldIssueMessage(fieldErrors.birthYear, ko)}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Label language={language} weight="bold">
-            {copy.bioLabel}
-          </Label>
-          <Input
-            language={language}
-            accessibilityLabel={copy.bioLabel}
-            placeholder={copy.bioPlaceholder}
-            value={bio}
-            onChangeText={updateBio}
-            multiline
-            maxLength={BIO_MAX}
-            editable={!locked}
-            style={styles.bioInput}
-          />
-          <View style={styles.counterRow}>
-            <View style={{ flex: 1 }} />
-            <Text style={[styles.counterText, { fontFamily: bodyFont }]}>
-              {countChars(bio)} / {BIO_MAX}
-            </Text>
+          <View style={styles.fieldGroup}>
+            <Label language={language} variant="label" tone="neutral">
+              {copy.birthYearLabel}
+            </Label>
+            <Input
+              language={language}
+              accessibilityLabel={copy.birthYearLabel}
+              placeholder={copy.birthYearPlaceholder}
+              value={birthYear}
+              onChangeText={updateBirthYear}
+              keyboardType="number-pad"
+              maxLength={4}
+              editable={!locked}
+              error={!!fieldErrors.birthYear}
+            />
+            {fieldErrors.birthYear ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[styles.inlineErrorText, { fontFamily: mediumFont }]}
+              >
+                {fieldIssueMessage(fieldErrors.birthYear, ko)}
+              </Text>
+            ) : (
+              <Text style={[styles.hintText, { fontFamily: bodyFont }]}>
+                {copy.birthYearHint}
+              </Text>
+            )}
           </View>
-          {fieldErrors.bio && (
-            <Text
-              accessibilityLiveRegion="polite"
-              style={[styles.errorText, { fontFamily: bodyFont }]}
-            >
-              {fieldIssueMessage(fieldErrors.bio, ko)}
-            </Text>
-          )}
+
+          <View style={styles.fieldGroup}>
+            <Label language={language} variant="label" tone="neutral">
+              {copy.bioLabel}
+            </Label>
+            <Input
+              language={language}
+              accessibilityLabel={copy.bioLabel}
+              placeholder={copy.bioPlaceholder}
+              value={bio}
+              onChangeText={updateBio}
+              multiline
+              maxLength={BIO_MAX}
+              editable={!locked}
+              error={!!fieldErrors.bio}
+              style={styles.bioInput}
+            />
+            <View style={styles.counterRow}>
+              {fieldErrors.bio ? (
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={[
+                    styles.inlineErrorText,
+                    { fontFamily: mediumFont, flex: 1 },
+                  ]}
+                >
+                  {fieldIssueMessage(fieldErrors.bio, ko)}
+                </Text>
+              ) : (
+                <View style={{ flex: 1 }} />
+              )}
+              <Text style={[styles.counterText, { fontFamily: bodyFont }]}>
+                {countChars(bio)} / {BIO_MAX}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {!!formError && (
-          <Text
-            accessibilityLiveRegion="polite"
-            style={[styles.errorText, { fontFamily: bodyFont }]}
-          >
-            {formError}
-          </Text>
+          <ErrorNotice language={language}>{formError}</ErrorNotice>
         )}
 
-        {refreshFailed ? (
-          <Button
-            language={language}
-            disabled={locked}
-            label={locked ? copy.savingButton : copy.retryRefresh}
-            onPress={() => void handleRetryRefresh()}
-          />
-        ) : (
-          <Button
-            language={language}
-            disabled={locked}
-            label={locked ? copy.savingButton : copy.nextButton}
-            onPress={() => void handleSubmit()}
-          />
-        )}
-
-        {submitting && (
-          <Button
-            secondary
-            language={language}
-            label={copy.cancelButton}
-            onPress={handleCancelSubmit}
-          />
-        )}
+        <ScreenFooter style={styles.footerOverride}>
+          {submitting && (
+            <View style={styles.cancelRow}>
+              <TextLink
+                variant="quiet"
+                language={language}
+                label={copy.cancelButton}
+                onPress={handleCancelSubmit}
+              />
+            </View>
+          )}
+          {refreshFailed ? (
+            <Button
+              language={language}
+              loading={submitting}
+              disabled={locked}
+              label={locked ? copy.savingButton : copy.retryRefresh}
+              onPress={() => void handleRetryRefresh()}
+            />
+          ) : (
+            <Button
+              language={language}
+              loading={submitting}
+              disabled={locked}
+              label={locked ? copy.savingButton : copy.nextButton}
+              onPress={() => void handleSubmit()}
+            />
+          )}
+        </ScreenFooter>
       </KeyboardAvoidingView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  content: {
+    gap: 0,
+  },
   keyboard: {
     flex: 1,
     gap: theme.space.lg,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: theme.size.appbar,
+  onboardingTop: {
+    gap: theme.space.xs,
   },
   backButton: {
     width: theme.size.touchMin,
     height: theme.size.touchMin,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
-  },
-  headerTitle: {
-    fontSize: theme.typography.title2.fontSize,
-    lineHeight: theme.typography.title2.lineHeight,
-    color: theme.color.text,
-  },
-  headerSpacer: {
-    width: theme.size.touchMin,
-    height: theme.size.touchMin,
   },
   avatarSection: {
     alignItems: "center",
@@ -653,15 +687,13 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: theme.color.background,
+    backgroundColor: theme.color.brandTint,
   },
   avatarPlaceholder: {
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: theme.color.background,
-    borderWidth: 1,
-    borderColor: theme.color.border,
+    backgroundColor: theme.color.brandTint,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -672,9 +704,9 @@ const styles = StyleSheet.create({
     minWidth: theme.size.touchMin,
     minHeight: theme.size.touchMin,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.color.main,
+    backgroundColor: theme.color.brand,
     borderWidth: 2,
-    borderColor: theme.color.white,
+    borderColor: theme.color.surface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -691,11 +723,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space.sm,
   },
   photoActionLabel: {
-    fontSize: theme.typography.caption1.fontSize,
-    color: theme.color.orangeInk,
+    fontSize: theme.typography.caption.fontSize,
+    color: theme.color.brandDeep,
+  },
+  fieldsWrap: {
+    gap: theme.space.xl,
   },
   fieldGroup: {
-    gap: theme.space.xs,
+    gap: theme.space.sm,
   },
   counterRow: {
     flexDirection: "row",
@@ -704,47 +739,55 @@ const styles = StyleSheet.create({
     gap: theme.space.sm,
   },
   hintText: {
-    fontSize: theme.typography.caption2.fontSize,
-    lineHeight: theme.typography.caption2.lineHeight,
-    color: theme.color.muted,
+    fontSize: theme.typography.status.fontSize,
+    lineHeight: theme.typography.status.lineHeight,
+    color: theme.color.labelDesc,
   },
   counterText: {
-    fontSize: theme.typography.caption2.fontSize,
-    lineHeight: theme.typography.caption2.lineHeight,
-    color: theme.color.text,
+    fontSize: theme.typography.status.fontSize,
+    lineHeight: theme.typography.status.lineHeight,
+    color: theme.color.labelDesc,
   },
   segmentTrack: {
     flexDirection: "row",
-    backgroundColor: theme.color.background,
-    borderRadius: theme.radius.input,
-    padding: theme.space.xs,
-    gap: theme.space.xs,
+    backgroundColor: theme.color.fillNormal,
+    borderRadius: theme.radius.button,
+    padding: 3,
+    gap: 3,
   },
   segmentButton: {
     flex: 1,
     minHeight: theme.size.touchMin,
-    borderRadius: theme.radius.sm,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: theme.space.xs,
   },
   segmentButtonSelected: {
-    backgroundColor: theme.color.white,
-    borderWidth: 1,
-    borderColor: theme.color.border,
+    backgroundColor: theme.color.surface,
+    ...theme.shadow.card,
   },
   segmentLabel: {
-    fontSize: theme.typography.caption1.fontSize,
-    color: theme.color.muted,
+    fontSize: theme.typography.desc.fontSize,
+    color: theme.color.labelAlt,
     textAlign: "center",
+  },
+  segmentLabelSelected: {
+    color: theme.color.labelNormal,
   },
   bioInput: {
     minHeight: 88,
     textAlignVertical: "top",
   },
-  errorText: {
-    fontSize: theme.typography.caption1.fontSize,
-    lineHeight: theme.typography.caption1.lineHeight,
-    color: theme.color.dangerInk,
+  inlineErrorText: {
+    fontSize: theme.typography.status.fontSize,
+    lineHeight: theme.typography.status.lineHeight,
+    color: theme.color.dangerPress,
+  },
+  cancelRow: {
+    alignItems: "center",
+  },
+  footerOverride: {
+    paddingTop: theme.space.md,
   },
 });

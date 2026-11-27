@@ -23,7 +23,9 @@ const styles = StyleSheet.create({
   },
   badgePublic: { backgroundColor: theme.color.tealSoft },
   text: {
-    ...theme.typography.caption1Bold,
+    // 커스텀 Bold 폰트에 fontWeight가 겹치지 않게 크기와 줄 높이만 쓴다.
+    fontSize: theme.typography.caption1Bold.fontSize,
+    lineHeight: theme.typography.caption1Bold.lineHeight,
     fontFamily: "NotoSansKR_700Bold",
     color: theme.color.muted,
   },

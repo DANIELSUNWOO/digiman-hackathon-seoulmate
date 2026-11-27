@@ -59,6 +59,22 @@ export const MATCHES: MatchItem[] = [
     progress: { visited: 2, required: 3, total: 6 },
     lastVisitAt: "2026-11-29T14:03:00+09:00",
   },
+  {
+    matchId: 103,
+    chatStatus: "READY",
+    partner: { nickname: "みお" },
+    courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
+    progress: { visited: 3, required: 3, total: 6 },
+    lastVisitAt: "2026-11-29T11:20:00+09:00",
+  },
+  {
+    matchId: 104,
+    chatStatus: "OPEN",
+    partner: { nickname: "そら" },
+    courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
+    progress: { visited: 4, required: 3, total: 6 },
+    lastVisitAt: "2026-11-28T18:45:00+09:00",
+  },
 ];
 
 export function mockSpots(map: MyMap): MapSpot[] {

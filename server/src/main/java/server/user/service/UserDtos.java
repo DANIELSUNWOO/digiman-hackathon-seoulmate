@@ -15,7 +15,7 @@ public final class UserDtos {
     private UserDtos() {}
 
     public record ProfileRequest(
-            @NotBlank @Size(min = 2, max = 12, message = "2~12자로 입력해 주세요.") String nickname,
+            @NotBlank @Size(min = 2, max = 8, message = "2~8자로 입력해 주세요.") String nickname,
             @NotNull Gender gender,
             @NotNull @Min(1900) @Max(2100) Integer birthYear,
             @Size(max = 500) String profileImageUrl,
@@ -23,7 +23,7 @@ public final class UserDtos {
 
     /** 보낸 필드만 수정. 성별·출생연도는 받지 않는다 */
     public record ProfileUpdateRequest(
-            @Size(min = 2, max = 12, message = "2~12자로 입력해 주세요.") String nickname,
+            @Size(min = 2, max = 8, message = "2~8자로 입력해 주세요.") String nickname,
             @Size(max = 500) String profileImageUrl,
             @Size(max = 200, message = "200자까지 입력할 수 있습니다.") String bio) {}
 

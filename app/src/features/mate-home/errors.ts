@@ -16,7 +16,8 @@ export function errorMessage(
   fallback: string = strings.errorDefault,
 ): string {
   if (!(error instanceof ApiError)) return fallback;
-  if (error.code === "NETWORK") return strings.errorNetwork;
+  if (error.code === "NETWORK" || error.code === "TIMEOUT")
+    return strings.errorNetwork;
   if (error.code === "SESSION_EXPIRED") return strings.errorSession;
   return SERVER_MESSAGES[error.serverError?.code ?? ""] ?? fallback;
 }

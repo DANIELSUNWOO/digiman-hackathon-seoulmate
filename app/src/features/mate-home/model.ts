@@ -20,12 +20,14 @@ export function previewLabel(map: Pick<MyMap, "previewCount">): string {
 export function progressLabel({ progress, chatStatus }: MatchItem): string {
   if (!progress) return strings.courseNotSelected;
   const visited = strings.visited(progress.visited, progress.total);
+  // 채팅을 열 수 있는지는 서버 상태를 따른다. 숫자는 남은 곳 수를 보여 줄 때만 쓴다.
   if (chatStatus === "OPEN") return `${visited} · ${strings.chatOpen}`;
+  if (chatStatus === "READY") return `${visited} · ${strings.chatReady}`;
   if (progress.required === null) return visited;
   const remaining = progress.required - progress.visited;
   return remaining > 0
     ? `${visited} · ${strings.chatRemaining(remaining)}`
-    : `${visited} · ${strings.chatReady}`;
+    : visited;
 }
 
 /** 서버가 KST(+09:00)로 내려주므로 문자열에서 잘라 쓴다. */

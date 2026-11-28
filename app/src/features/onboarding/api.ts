@@ -131,10 +131,12 @@ export async function submitVerification(
     if (!file.uri || !file.uri.trim()) {
       throw { code: "IMAGE_EMPTY" };
     }
+    const { File } = await import("expo-file-system");
+    const nativeFile = new File(file.uri);
     form.append("passportImage", {
-      uri: file.uri,
       name: file.name,
       type: resolvedMime,
+      bytes: () => nativeFile.bytes(),
     } as unknown as Blob);
   } else if (
     file.kind === "web-blob" ||

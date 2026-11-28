@@ -1,13 +1,6 @@
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRole } from "../src/state";
 import { useSession } from "../src/session";
 import {
@@ -116,10 +109,7 @@ export default function Email() {
 
   return (
     <Screen contentStyle={s.content}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={s.keyboard}
-      >
+      <View style={s.body}>
         <AppBar
           title={pageTitle}
           language={language}
@@ -360,7 +350,7 @@ export default function Email() {
             onPress={submit}
           />
         </ScreenFooter>
-      </KeyboardAvoidingView>
+      </View>
     </Screen>
   );
 }
@@ -369,8 +359,8 @@ const s = StyleSheet.create({
   content: {
     gap: 0,
   },
-  keyboard: {
-    flex: 1,
+  body: {
+    flexGrow: 1,
     gap: theme.space.md,
   },
   formGroup: {

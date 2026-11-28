@@ -1,12 +1,24 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  type ComponentRef,
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { CaretLeft, Info, WarningCircle } from "phosphor-react-native";
 import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
+  Dimensions,
   Easing,
+  Keyboard,
   KeyboardAvoidingView,
+  type LayoutChangeEvent,
   Modal,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -27,6 +39,20 @@ export type FontWeightName = "regular" | "medium" | "semibold" | "bold";
 
 const PRESS_SCALE = 0.98;
 const INTERACTION_DURATION_MS = 120;
+
+type ViewHandle = ComponentRef<typeof View>;
+type ScrollViewHandle = ComponentRef<typeof ScrollView>;
+
+type ScreenScrollContextValue = {
+  registerFocus: (target: ViewHandle | null) => void;
+  clearFocus: (target: ViewHandle | null) => void;
+  scrollInputIntoView: (target: ViewHandle | null) => void;
+  notifyFooterLayout: (footerBottom: number, prevFooterBottom: number) => void;
+};
+
+const ScreenScrollContext = createContext<ScreenScrollContextValue | null>(
+  null,
+);
 
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -99,14 +125,177 @@ export function Screen({
   children: React.ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
 }) {
+  const viewportRef = useRef<ViewHandle | null>(null);
+  const scrollRef = useRef<ScrollViewHandle | null>(null);
+  const scrollOffsetRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+  const focusedTargetRef = useRef<ViewHandle | null>(null);
+  const keyboardTopRef = useRef(0);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  function scrollInputIntoView(target: ViewHandle | null) {
+    const viewport = viewportRef.current;
+    const scroller = scrollRef.current;
+    if (!target || !viewport || !scroller) return;
+    if (
+      typeof viewport.measureInWindow !== "function" ||
+      typeof target.measureInWindow !== "function"
+    ) {
+      return;
+    }
+    viewport.measureInWindow((_sx, svY, _sw, svH) => {
+      if (!mountedRef.current || focusedTargetRef.current !== target) return;
+      target.measureInWindow((_tx, ty, _tw, th) => {
+        if (!mountedRef.current || focusedTargetRef.current !== target) return;
+        const kbTop = keyboardTopRef.current;
+        const bottomEdge = kbTop > 0 ? Math.min(svY + svH, kbTop) : svY + svH;
+        const visibleBottom = bottomEdge - 24;
+        const visibleTop = svY + 16;
+        if (ty + th > visibleBottom) {
+          const nextY = Math.max(
+            0,
+            scrollOffsetRef.current + (ty + th - visibleBottom),
+          );
+          scroller.scrollTo?.({ y: nextY, animated: true });
+        } else if (ty < visibleTop) {
+          const nextY = Math.max(
+            0,
+            scrollOffsetRef.current - (visibleTop - ty),
+          );
+          scroller.scrollTo?.({ y: nextY, animated: true });
+        }
+      });
+    });
+  }
+
+  function scheduleFocusScroll(target: ViewHandle | null) {
+    if (scrollTimerRef.current) {
+      clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = null;
+    }
+    if (!target) return;
+    scrollTimerRef.current = setTimeout(() => {
+      scrollTimerRef.current = null;
+      scrollInputIntoView(target);
+    }, 60);
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard?.addListener?.(showEvent, (e) => {
+      const winH = Dimensions?.get?.("window")?.height ?? 0;
+      const screenY = e?.endCoordinates?.screenY ?? 0;
+      const kbHeight = e?.endCoordinates?.height ?? 0;
+      const kbTop = screenY > 0 ? screenY : Math.max(0, winH - kbHeight);
+      keyboardTopRef.current = kbTop;
+
+      if (Platform.OS !== "ios" && Platform.OS !== "web") {
+        const viewport = viewportRef.current;
+        if (viewport && typeof viewport.measureInWindow === "function") {
+          viewport.measureInWindow((_sx, svY, _sw, svH) => {
+            if (!mountedRef.current) return;
+            const overlap =
+              kbTop > 0
+                ? Math.max(0, Math.round(svY + svH - kbTop))
+                : Math.max(0, Math.round(kbHeight));
+            setKeyboardInset(overlap);
+            scheduleFocusScroll(focusedTargetRef.current);
+          });
+          return;
+        }
+        setKeyboardInset(Math.max(0, Math.round(kbHeight)));
+      }
+      scheduleFocusScroll(focusedTargetRef.current);
+    });
+
+    const hideSub = Keyboard?.addListener?.(hideEvent, () => {
+      keyboardTopRef.current = 0;
+      setKeyboardInset(0);
+    });
+
+    return () => {
+      mountedRef.current = false;
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+        scrollTimerRef.current = null;
+      }
+      showSub?.remove?.();
+      hideSub?.remove?.();
+    };
+  }, []);
+
+  const contextValue: ScreenScrollContextValue = {
+    registerFocus: (target) => {
+      focusedTargetRef.current = target;
+      scheduleFocusScroll(target);
+    },
+    clearFocus: (target) => {
+      if (focusedTargetRef.current === target) {
+        focusedTargetRef.current = null;
+      }
+    },
+    scrollInputIntoView,
+    notifyFooterLayout: (footerBottom, prevFooterBottom) => {
+      if (
+        prevFooterBottom > 0 &&
+        keyboardTopRef.current === 0 &&
+        footerBottom > prevFooterBottom + 4 &&
+        prevFooterBottom <=
+          scrollOffsetRef.current + viewportHeightRef.current + 24 &&
+        footerBottom > scrollOffsetRef.current + viewportHeightRef.current - 8
+      ) {
+        requestAnimationFrame(() => {
+          if (mountedRef.current) {
+            scrollRef.current?.scrollToEnd?.({ animated: true });
+          }
+        });
+      }
+    },
+  };
+
+  const scrollBody = (
+    <ScreenScrollContext.Provider value={contextValue}>
+      <View ref={viewportRef} collapsable={false} style={s.flex}>
+        <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}
+          onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+          }}
+          onLayout={(e: LayoutChangeEvent) => {
+            viewportHeightRef.current = e.nativeEvent.layout.height;
+          }}
+          contentContainerStyle={[
+            s.content,
+            contentStyle,
+            keyboardInset > 0
+              ? { paddingBottom: t.space.xl + keyboardInset }
+              : null,
+          ]}
+        >
+          {children}
+        </ScrollView>
+      </View>
+    </ScreenScrollContext.Provider>
+  );
+
   return (
-    <SafeAreaView style={s.screen}>
-      <ScrollView
-        contentContainerStyle={[s.content, contentStyle]}
-        keyboardShouldPersistTaps="handled"
-      >
-        {children}
-      </ScrollView>
+    <SafeAreaView style={s.screen} edges={["top", "bottom", "left", "right"]}>
+      {Platform.OS === "ios" ? (
+        <KeyboardAvoidingView behavior="padding" style={s.flex}>
+          {scrollBody}
+        </KeyboardAvoidingView>
+      ) : (
+        scrollBody
+      )}
     </SafeAreaView>
   );
 }
@@ -337,12 +526,16 @@ export function Input({
   error = false,
   onFocus,
   onBlur,
+  onContentSizeChange,
   ...props
 }: TextInputProps & { language?: "ko" | "ja"; error?: boolean }) {
   const fontFamily = useFontFamily("regular", language);
   const reducedMotion = useReducedMotion();
   const [focused, setFocused] = useState(false);
   const focusAnim = useRef(new Animated.Value(0)).current;
+  const wrapRef = useRef<ViewHandle | null>(null);
+  const screenScroll = useContext(ScreenScrollContext);
+  const isMultiline = Boolean(props.multiline);
   const disabled = props.editable === false;
   const webInputReset =
     Platform.OS === "web"
@@ -364,39 +557,51 @@ export function Input({
   });
 
   return (
-    <Animated.View
-      style={[
-        s.inputWrap,
-        disabled && s.inputDisabled,
-        {
-          borderColor: error
-            ? t.color.danger
-            : disabled
-              ? t.color.lineNormal
-              : animatedBorderColor,
-        },
-      ]}
-    >
-      <TextInput
-        placeholderTextColor={t.color.labelAlt}
-        {...props}
-        onFocus={(e) => {
-          setFocused(true);
-          onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          onBlur?.(e);
-        }}
+    <View ref={wrapRef} collapsable={false}>
+      <Animated.View
         style={[
-          s.inputInner,
-          webInputReset,
-          { fontFamily },
-          disabled && s.inputDisabledText,
-          props.style,
+          s.inputWrap,
+          isMultiline && s.inputWrapMultiline,
+          disabled && s.inputDisabled,
+          {
+            borderColor: error
+              ? t.color.danger
+              : disabled
+                ? t.color.lineNormal
+                : animatedBorderColor,
+          },
         ]}
-      />
-    </Animated.View>
+      >
+        <TextInput
+          placeholderTextColor={t.color.labelAlt}
+          underlineColorAndroid="transparent"
+          {...props}
+          onFocus={(e) => {
+            setFocused(true);
+            screenScroll?.registerFocus(wrapRef.current);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            screenScroll?.clearFocus(wrapRef.current);
+            onBlur?.(e);
+          }}
+          onContentSizeChange={(e) => {
+            if (focused && isMultiline) {
+              screenScroll?.scrollInputIntoView(wrapRef.current);
+            }
+            onContentSizeChange?.(e);
+          }}
+          style={[
+            isMultiline ? s.inputInnerMultiline : s.inputInnerSingle,
+            webInputReset,
+            { fontFamily },
+            disabled && s.inputDisabledText,
+            props.style,
+          ]}
+        />
+      </Animated.View>
+    </View>
   );
 }
 
@@ -469,9 +674,11 @@ export function BottomSheet({
         />
         <SafeAreaView edges={["bottom"]} style={s.sheet}>
           <View style={s.sheetHandle} />
-          <ScrollView keyboardShouldPersistTaps="handled">
-            {children}
-          </ScrollView>
+          <ScreenScrollContext.Provider value={null}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {children}
+            </ScrollView>
+          </ScreenScrollContext.Provider>
         </SafeAreaView>
       </KeyboardAvoidingView>
     </Modal>
@@ -652,7 +859,22 @@ export function ScreenFooter({
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
-  return <View style={[s.screenFooter, style]}>{children}</View>;
+  const screenScroll = useContext(ScreenScrollContext);
+  const prevBottomRef = useRef(0);
+
+  return (
+    <View
+      onLayout={(e) => {
+        const bottom = e.nativeEvent.layout.y + e.nativeEvent.layout.height;
+        const prev = prevBottomRef.current;
+        prevBottomRef.current = bottom;
+        screenScroll?.notifyFooterLayout(bottom, prev);
+      }}
+      style={[s.screenFooter, style]}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function HelperNotice({
@@ -695,6 +917,7 @@ export function ErrorNotice({
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: t.color.surface },
+  flex: { flex: 1 },
   content: {
     flexGrow: 1,
     paddingHorizontal: t.space.screen,
@@ -706,6 +929,7 @@ const s = StyleSheet.create({
     fontSize: t.typography.body2.fontSize,
     lineHeight: t.typography.body2.lineHeight,
     color: t.color.labelNormal,
+    includeFontPadding: false,
   },
   title: {
     fontSize: t.typography.titleBig.fontSize,
@@ -776,6 +1000,8 @@ const s = StyleSheet.create({
     lineHeight: t.typography.body1.lineHeight,
     color: t.color.surface,
     textAlign: "center",
+    flexShrink: 1,
+    includeFontPadding: false,
   },
   card: {
     borderRadius: t.radius.card,
@@ -799,13 +1025,30 @@ const s = StyleSheet.create({
     borderRadius: t.radius.input,
     justifyContent: "center",
   },
-  inputInner: {
+  inputWrapMultiline: {
+    justifyContent: "flex-start",
+  },
+  inputInnerSingle: {
     minHeight: t.size.input - 3,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: Platform.OS === "web" ? 10 : 4,
+    color: t.color.labelNormal,
+    fontSize: t.typography.body1.fontSize,
+    ...(Platform.OS === "web"
+      ? { lineHeight: t.typography.body1.lineHeight }
+      : {}),
+    textAlignVertical: "center",
+    includeFontPadding: false,
+  },
+  inputInnerMultiline: {
+    minHeight: t.size.input - 3,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     color: t.color.labelNormal,
     fontSize: t.typography.body1.fontSize,
     lineHeight: t.typography.body1.lineHeight,
+    textAlignVertical: "top",
+    includeFontPadding: false,
   },
   inputDisabled: {
     backgroundColor: t.color.surface2,
@@ -901,13 +1144,16 @@ const s = StyleSheet.create({
     paddingVertical: 14,
   },
   noticeIcon: {
-    paddingTop: 1,
+    height: t.typography.desc.lineHeight,
+    justifyContent: "center",
   },
   noticeText: {
     flex: 1,
     fontSize: t.typography.desc.fontSize,
     lineHeight: t.typography.desc.lineHeight,
     color: t.color.labelNeutral,
+    includeFontPadding: false,
+    textAlign: "left",
   },
   trackerRow: {
     flexDirection: "row",
@@ -1005,13 +1251,16 @@ const s = StyleSheet.create({
     paddingHorizontal: 2,
   },
   helperNoticeIcon: {
-    paddingTop: 2,
+    height: t.typography.caption.lineHeight,
+    justifyContent: "center",
   },
   helperNoticeText: {
     flex: 1,
     fontSize: t.typography.caption.fontSize,
     lineHeight: t.typography.caption.lineHeight,
     color: t.color.labelDesc,
+    includeFontPadding: false,
+    textAlign: "left",
   },
   errorNotice: {
     flexDirection: "row",
@@ -1023,12 +1272,15 @@ const s = StyleSheet.create({
     paddingVertical: 10,
   },
   errorNoticeIcon: {
-    paddingTop: 1,
+    height: t.typography.caption.lineHeight,
+    justifyContent: "center",
   },
   errorNoticeText: {
     flex: 1,
     fontSize: t.typography.caption.fontSize,
     lineHeight: t.typography.caption.lineHeight,
     color: t.color.dangerPress,
+    includeFontPadding: false,
+    textAlign: "left",
   },
 });

@@ -15,7 +15,7 @@ export const strings = {
   editMapTitle: "지도 수정",
   titleField: "지도 이름",
   titlePlaceholder: "예: 혼자 가기 좋은 성수 카페",
-  captionField: "캡션 (선택)",
+  captionField: "한 줄 소개 (선택)",
   captionPlaceholder: "어떤 지도인지 한두 문장으로 알려 주세요",
   save: "저장",
   saving: "저장 중",
@@ -67,7 +67,7 @@ export const strings = {
   errorMapInUse:
     "여행 코스로 선택됐거나 방문 기록이 있는 지도는 삭제할 수 없어요",
   errorMapLocked: "여행 중인 여행자가 있어 지금은 바꿀 수 없어요",
-  errorValidation: "이름은 30자, 캡션은 300자까지 쓸 수 있어요",
+  errorValidation: "이름은 30자, 한 줄 소개는 300자까지 쓸 수 있어요",
   spotCount: (count: number) => `스팟 ${count}곳`,
   spotShortage: (count: number, min: number) => `스팟 ${count} / ${min}`,
   previewCount: (count: number, required: number) =>

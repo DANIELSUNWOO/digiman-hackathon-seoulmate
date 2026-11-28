@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AlbumApi } from "./api";
-import type { Album } from "./types";
+import type { Album, TripRange } from "./types";
 
 export type AlbumState =
   | { status: "loading" }
   | { status: "error"; error: unknown }
-  | { status: "ready"; album: Album };
+  | { status: "ready"; album: Album; trip: TripRange | null };
 
 export interface AlbumLoad {
   state: AlbumState;
@@ -19,9 +19,11 @@ export function useAlbum(api: AlbumApi, matchId: number): AlbumLoad {
 
   useEffect(() => {
     let active = true;
-    api.get(matchId).then(
-      (album) => {
-        if (active) setState({ status: "ready", album });
+    // 여행 일정은 곁들이는 정보라 못 읽어도 앨범은 보여 준다.
+    const trip = api.getTrip(matchId).catch(() => null);
+    Promise.all([api.get(matchId), trip]).then(
+      ([album, range]) => {
+        if (active) setState({ status: "ready", album, trip: range });
       },
       (error: unknown) => {
         if (active) setState({ status: "error", error });

@@ -1,7 +1,7 @@
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 import { ActivityIndicator } from "react-native";
 import { theme } from "../../theme";
-import { Button, Label, Screen } from "../../ui";
+import { AppBar, Button, Label, Screen } from "../../ui";
 import type { ViewerLang } from "../translation";
 import { errorText } from "./errors";
 import { strings } from "./strings";
@@ -10,7 +10,7 @@ import type { AlbumState } from "./useAlbum";
 export interface AlbumStatusProps {
   state: Exclude<AlbumState, { status: "ready" }>;
   lang: ViewerLang;
-  top: ReactNode;
+  onBack: () => void;
   onRetry: () => void;
 }
 
@@ -18,16 +18,18 @@ export interface AlbumStatusProps {
 export function AlbumStatus({
   state,
   lang,
-  top,
+  onBack,
   onRetry,
 }: AlbumStatusProps): ReactElement {
   const text = strings[lang];
   return (
     <Screen>
-      {top}
-      <Label title language={lang}>
-        {text.title}
-      </Label>
+      <AppBar
+        title={text.title}
+        language={lang}
+        backLabel={text.back}
+        onBack={onBack}
+      />
       {state.status === "loading" ? (
         <ActivityIndicator
           accessibilityLabel={text.loading}

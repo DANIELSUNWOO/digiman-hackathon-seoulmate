@@ -156,6 +156,14 @@ export default function Auth() {
             disabled={busy}
             onPress={() => router.push("/email")}
           />
+          {__DEV__ && (
+            <Button
+              label="[DEV] 지도 검증"
+              language="ko"
+              secondary
+              onPress={() => router.push("/dev/map")}
+            />
+          )}
         </ScreenFooter>
       </View>
     </Screen>

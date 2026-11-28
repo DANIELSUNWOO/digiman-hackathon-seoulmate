@@ -23,8 +23,20 @@
           "cameraPermission": "본인 인증 시연과 프로필 사진 촬영을 위해 카메라 권한이 필요합니다.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": [
+              "https://repository.map.naver.com/archive/maven"
+            ]
+          }
+        }
       ]
     ],
+    "ios": { "bundleIdentifier": "com.seoulmate.app" },
+    "android": { "package": "com.seoulmate.app" },
     "web": { "bundler": "metro" }
   }
 }

@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.space.md,
-    minHeight: theme.size.touchMin,
+    minHeight: theme.size.input,
     paddingHorizontal: theme.space.md,
     borderRadius: theme.radius.input,
     backgroundColor: theme.color.surface2,

@@ -1,14 +1,24 @@
-// "여행 중", "공개 중" 같은 초록 상태 라벨.
+// "여행 중", "공개 중", "공개" 같은 상태 라벨.
 import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { theme } from "../../theme";
 import { useFontFamily } from "../../ui";
 
-export function StatusPill({ label }: { label: string }): ReactElement {
+export type PillTone = "positive" | "neutral" | "brand";
+
+export interface StatusPillProps {
+  label: string;
+  tone?: PillTone;
+}
+
+export function StatusPill({
+  label,
+  tone = "positive",
+}: StatusPillProps): ReactElement {
   const fontFamily = useFontFamily("bold", "ko");
   return (
-    <View style={styles.pill}>
-      <Text style={[styles.text, { fontFamily }]}>{label}</Text>
+    <View style={[styles.pill, backgrounds[tone]]}>
+      <Text style={[styles.text, texts[tone], { fontFamily }]}>{label}</Text>
     </View>
   );
 }
@@ -16,12 +26,23 @@ export function StatusPill({ label }: { label: string }): ReactElement {
 const styles = StyleSheet.create({
   pill: {
     paddingHorizontal: theme.space.sm,
-    borderRadius: theme.radius.status,
-    backgroundColor: theme.color.positiveSoft,
+    paddingVertical: theme.space.xs,
+    borderRadius: theme.radius.pill,
   },
   text: {
     fontSize: theme.typography.status.fontSize,
     lineHeight: theme.typography.status.lineHeight,
-    color: theme.color.positive,
   },
+});
+
+const backgrounds = StyleSheet.create({
+  positive: { backgroundColor: theme.color.positiveSoft },
+  neutral: { backgroundColor: theme.color.fillNormal },
+  brand: { backgroundColor: theme.color.brandSoft },
+});
+
+const texts = StyleSheet.create({
+  positive: { color: theme.color.positive },
+  neutral: { color: theme.color.labelDesc },
+  brand: { color: theme.color.brandDeep },
 });

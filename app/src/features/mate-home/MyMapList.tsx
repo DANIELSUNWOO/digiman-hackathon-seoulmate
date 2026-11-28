@@ -1,14 +1,12 @@
 // M-10 "공개 중 / 만드는 중" 탭과 지도 카드.
 import { useCallback, useState, type ReactElement } from "react";
-import { StyleSheet, View } from "react-native";
-import { theme } from "../../theme";
-import { Button, Chip, Label } from "../../ui";
+import { Button, Label } from "../../ui";
+import { FlatCard } from "./FlatCard";
 import { MapListCard } from "./MapListCard";
+import { MapTabs, type MapTab } from "./MapTabs";
 import { strings } from "./strings";
 import { SwipeArea, type SwipeDirection } from "./SwipeArea";
 import type { MyMap } from "./types";
-
-type MapTab = "published" | "draft";
 
 export interface MyMapListProps {
   maps: readonly MyMap[];
@@ -63,35 +61,10 @@ export function MyMapList({
   );
 }
 
-interface MapTabsProps {
-  selected: MapTab;
-  counts: Record<MapTab, number>;
-  onSelect: (tab: MapTab) => void;
-}
-
-function MapTabs({ selected, counts, onSelect }: MapTabsProps): ReactElement {
-  return (
-    <View style={styles.tabs}>
-      <Chip
-        label={`${strings.published} ${counts.published}`}
-        language="ko"
-        selected={selected === "published"}
-        onPress={() => onSelect("published")}
-      />
-      <Chip
-        label={`${strings.drafting} ${counts.draft}`}
-        language="ko"
-        selected={selected === "draft"}
-        onPress={() => onSelect("draft")}
-      />
-    </View>
-  );
-}
-
 /** 지도가 하나도 없을 때는 머리의 + 말고도 만들 수 있게 한다. */
 function NoMaps({ onCreate }: { onCreate: () => void }): ReactElement {
   return (
-    <>
+    <FlatCard>
       <Label center language="ko">
         {strings.mapsEmpty}
       </Label>
@@ -101,10 +74,6 @@ function NoMaps({ onCreate }: { onCreate: () => void }): ReactElement {
         secondary
         onPress={onCreate}
       />
-    </>
+    </FlatCard>
   );
 }
-
-const styles = StyleSheet.create({
-  tabs: { flexDirection: "row", gap: theme.space.sm },
-});

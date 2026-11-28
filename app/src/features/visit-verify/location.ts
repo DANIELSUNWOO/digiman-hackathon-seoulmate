@@ -1,5 +1,5 @@
 import * as Location from "expo-location";
-import { withTimeout } from "./timeout";
+import { withTimeout } from "../photo-upload/timeout";
 import type { LocationResult, ReadPosition } from "./types";
 
 const TIMEOUT_MS = 15_000;

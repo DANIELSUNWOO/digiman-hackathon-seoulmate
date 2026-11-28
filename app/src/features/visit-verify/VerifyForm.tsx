@@ -1,11 +1,12 @@
 import { MapPinArea } from "phosphor-react-native";
 import { useState, type ReactElement } from "react";
 import { theme } from "../../theme";
+import type { PickPhoto } from "../photo-upload";
 import { Button, Label, Notice, ScreenFooter } from "../../ui";
 import { PhotoField } from "./PhotoField";
 import { ReviewField } from "./ReviewField";
 import { strings } from "./strings";
-import type { PickPhoto, ReadPosition, SubmitVisit } from "./types";
+import type { ReadPosition, SubmitVisit } from "./types";
 import { usePhoto } from "./usePhoto";
 import { useVerification } from "./useVerification";
 import { VerifyDone } from "./VerifyDone";

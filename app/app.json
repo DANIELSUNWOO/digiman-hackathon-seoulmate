@@ -6,7 +6,17 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "프로필 사진 선택을 위해 사진 보관함 접근 권한이 필요합니다.",
+          "cameraPermission": "본인 인증 시연과 프로필 사진 촬영을 위해 카메라 권한이 필요합니다.",
+          "microphonePermission": false
+        }
+      ]
+    ],
     "web": { "bundler": "metro" }
   }
 }

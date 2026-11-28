@@ -9,15 +9,17 @@ import {
   type MockScenario,
 } from "../../src/features/visits/mockApi";
 import { theme } from "../../src/theme";
-import { Chip } from "../../src/ui";
+import { Chip, Label } from "../../src/ui";
 
 const LANGS: ViewerLang[] = ["ko", "ja"];
-const SCENARIOS: MockScenario[] = ["data", "empty", "error"];
+const SCENARIOS: MockScenario[] = ["data", "empty", "error", "actionError"];
 
 // 방문 기록 화면 확인용 경로. 로그인과 서버 없이 목 데이터로 본다. 개발 빌드에서만 열린다.
+// ko는 메이트, ja는 여행자 화면이다.
 export default function DevVisits(): ReactElement {
   const [lang, setLang] = useState<ViewerLang>("ko");
   const [scenario, setScenario] = useState<MockScenario>("data");
+  const [reported, setReported] = useState("-");
   const api = useMemo(() => createMockVisitsApi(scenario), [scenario]);
   if (!__DEV__) return <Redirect href="/" />;
 
@@ -47,13 +49,18 @@ export default function DevVisits(): ReactElement {
             onPress={() => setScenario(value)}
           />
         ))}
+        <Label language="ko">{`마지막 신고: ${reported}`}</Label>
       </View>
       <View key={`${scenario}-${lang}`} style={{ flex: 1 }}>
         <VisitListScreen
           api={api}
           matchId={101}
           lang={lang}
+          canWrite={lang === "ko"}
           onBack={() => {}}
+          onReport={(target) =>
+            setReported(`${target.targetType} ${target.targetId}`)
+          }
         />
       </View>
     </SafeAreaView>

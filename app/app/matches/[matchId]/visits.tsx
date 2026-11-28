@@ -24,6 +24,7 @@ export default function Visits(): ReactElement | null {
       key={matchId}
       matchId={matchId}
       lang={load.me.language}
+      canWrite={load.me.role === "MATE"}
       onBack={() =>
         router.canGoBack() ? router.back() : router.replace("/(tabs)")
       }

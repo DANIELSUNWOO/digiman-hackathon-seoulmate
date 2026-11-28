@@ -30,4 +30,8 @@ export const strings = {
   errorLocked: "여행 중인 여행자가 있어 지금은 바꿀 수 없어요",
   errorValidation: "입력한 내용을 확인해 주세요",
   errorDefault: "저장하지 못했어요. 다시 시도해 주세요",
+  errorSavedHere: (name: string) =>
+    `‘${name}’ 스팟은 이미 저장됐어요. 지금 고친 내용은 반영되지 않았으니 지도에서 확인해 주세요`,
+  errorSavedBefore: (name: string) =>
+    `이전에 저장한 ‘${name}’ 스팟은 이미 등록됐어요. 지금 장소는 아직 저장하지 않았어요. 다시 저장하면 새로 등록해요`,
 } as const;

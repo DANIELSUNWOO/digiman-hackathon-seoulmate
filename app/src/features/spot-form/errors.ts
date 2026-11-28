@@ -9,8 +9,29 @@ const SERVER_MESSAGES: Record<string, string> = {
   VALIDATION_ERROR: strings.errorValidation,
 };
 
+/** 응답을 못 받았던 저장이 실제로는 되어 있어 이번 요청을 보내지 않았다. */
+export class AlreadySavedError extends Error {
+  constructor(
+    readonly spotName: string,
+    readonly samePlace: boolean,
+  ) {
+    super("spot already saved");
+    this.name = "AlreadySavedError";
+  }
+}
+
+function alreadySavedMessage({
+  spotName,
+  samePlace,
+}: AlreadySavedError): string {
+  return samePlace
+    ? strings.errorSavedHere(spotName)
+    : strings.errorSavedBefore(spotName);
+}
+
 /** 화면 문구는 서버 message가 아니라 code로 앱이 정한다. */
 export function errorMessage(error: unknown): string {
+  if (error instanceof AlreadySavedError) return alreadySavedMessage(error);
   if (error instanceof UploadError) return strings.errorUpload;
   if (!(error instanceof ApiError)) return strings.errorDefault;
   if (error.code === "NETWORK" || error.code === "TIMEOUT")

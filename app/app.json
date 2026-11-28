@@ -9,6 +9,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "訪問の認証のため、現在地を1回だけ確認します。(방문 인증을 위해 현재 위치를 한 번 확인합니다.)",
+          "locationAlwaysPermission": false,
+          "locationAlwaysAndWhenInUsePermission": false
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "프로필 사진 선택을 위해 사진 보관함 접근 권한이 필요합니다.",

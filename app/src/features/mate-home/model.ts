@@ -7,16 +7,6 @@ export const MAP_PREVIEW_SPOTS = 2;
 export const MAP_TITLE_MAX = 30;
 export const MAP_CAPTION_MAX = 300;
 
-export function spotLabel(map: Pick<MyMap, "spotCount">): string {
-  return map.spotCount >= MAP_MIN_SPOTS
-    ? strings.spotCount(map.spotCount)
-    : strings.spotShortage(map.spotCount, MAP_MIN_SPOTS);
-}
-
-export function previewLabel(map: Pick<MyMap, "previewCount">): string {
-  return strings.previewCount(map.previewCount, MAP_PREVIEW_SPOTS);
-}
-
 export type HomeKind = "matched" | "waiting" | "unpublished";
 
 export function homeKind(

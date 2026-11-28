@@ -36,6 +36,16 @@ export function ChatRoomContainer({
   const [safetyScope, setSafetyScope] = useState("");
   const [openSheetMounted, setOpenSheetMounted] = useState(false);
   const [blockRevision, setBlockRevision] = useState(0);
+  const blockQuery = useRef<{
+    generation: number;
+    key: string;
+    abort: AbortController | null;
+  }>({ generation: 0, key: "", abort: null });
+  const invalidateBlockQuery = () => {
+    blockQuery.current.generation++;
+    blockQuery.current.abort?.abort();
+    blockQuery.current.abort = null;
+  };
   const [target, setTarget] = useState<ReportTarget>({
     type: "PROFILE",
     id: null,
@@ -71,6 +81,7 @@ export function ChatRoomContainer({
       setFocused(true);
       return () => {
         setFocused(false);
+        invalidateBlockQuery();
         safetyController.invalidate();
         if (safetyVisibleRef.current) setSafetyClosing(true);
         setSafetyVisible(false);
@@ -82,6 +93,7 @@ export function ChatRoomContainer({
     const subscription = AppState.addEventListener("change", (state) => {
       setForeground(state === "active");
       if (state !== "active") {
+        invalidateBlockQuery();
         safetyController.invalidate();
         if (safetyVisibleRef.current) setSafetyClosing(true);
         setSafetyVisible(false);
@@ -112,6 +124,10 @@ export function ChatRoomContainer({
   });
   const partnerId = room.match?.partner.userId ?? "";
   const blockKey = JSON.stringify([scope, partnerId]);
+  if (blockQuery.current.key !== blockKey) {
+    invalidateBlockQuery();
+    blockQuery.current.key = blockKey;
+  }
   const safetyActive = focused && foreground && !!partnerId;
   safetyController.configure(
     identity.accountId,
@@ -123,23 +139,56 @@ export function ChatRoomContainer({
   useEffect(() => {
     if (!safetyActive) return;
     const abort = new AbortController();
+    invalidateBlockQuery();
+    blockQuery.current.abort = abort;
+    const generation = blockQuery.current.generation;
     let current = true;
     setBlockState({ key: blockKey, value: null });
     safetyApi.blocked(identity.token, partnerId, abort.signal).then(
       (value) => {
-        if (current) setBlockState({ key: blockKey, value });
+        if (
+          current &&
+          !abort.signal.aborted &&
+          blockQuery.current.generation === generation &&
+          blockQuery.current.key === blockKey
+        ) {
+          if (value)
+            safetyController.noteBlockConfirmed(identity.accountId, matchId);
+          const confirmed = safetyController.isBlockConfirmed(
+            identity.accountId,
+            matchId,
+          );
+          const unresolved = safetyController.isBlockUnresolved(
+            identity.accountId,
+            matchId,
+          );
+          setBlockState({
+            key: blockKey,
+            value: confirmed || value ? true : unresolved ? null : false,
+          });
+        }
       },
       () => {
-        if (current) setBlockState({ key: blockKey, value: null });
+        if (
+          current &&
+          !abort.signal.aborted &&
+          blockQuery.current.generation === generation &&
+          blockQuery.current.key === blockKey
+        )
+          setBlockState({ key: blockKey, value: null });
       },
     );
     return () => {
       current = false;
-      abort.abort();
+      if (blockQuery.current.abort === abort) invalidateBlockQuery();
+      else abort.abort();
     };
   }, [blockKey, safetyActive, blockRevision]);
   const blocked = blockState.key === blockKey ? blockState.value : null;
-  const canInteract = blocked === false;
+  const canInteract =
+    blocked === false &&
+    !safetyController.isBlockConfirmed(identity.accountId, matchId) &&
+    !safetyController.isBlockUnresolved(identity.accountId, matchId);
   const showOpenSheet =
     sheet.visible && canInteract && !safetyVisible && !safetyClosing;
   useEffect(() => {
@@ -170,7 +219,14 @@ export function ChatRoomContainer({
             ? { ...room.match, canMessage: false, canOpen: false }
             : room.match
         }
-        onSend={canInteract ? room.onSend : () => {}}
+        onSend={() => {
+          if (
+            canInteract &&
+            !safetyController.isBlockConfirmed(identity.accountId, matchId) &&
+            !safetyController.isBlockUnresolved(identity.accountId, matchId)
+          )
+            room.onSend();
+        }}
         notice={
           blocked === null
             ? identity.language === "ko"
@@ -179,10 +235,27 @@ export function ChatRoomContainer({
             : room.notice
         }
         onRefresh={() => {
+          invalidateBlockQuery();
           setBlockRevision((value) => value + 1);
           room.onRefresh();
         }}
-        onRequestOpenChat={canInteract ? room.onRequestOpenChat : undefined}
+        onRequestOpenChat={
+          canInteract
+            ? () => {
+                if (
+                  !safetyController.isBlockConfirmed(
+                    identity.accountId,
+                    matchId,
+                  ) &&
+                  !safetyController.isBlockUnresolved(
+                    identity.accountId,
+                    matchId,
+                  )
+                )
+                  room.onRequestOpenChat?.();
+              }
+            : undefined
+        }
         onSafetyMenu={() => openSafety({ type: "PROFILE", id: null })}
         onReportMessage={(message) => {
           const selected =
@@ -257,10 +330,14 @@ export function ChatRoomContainer({
         }}
         onDismissed={() => setSafetyClosing(false)}
         onBlocked={() => {
+          invalidateBlockQuery();
           setBlockState({ key: blockKey, value: true });
           room.onRefresh();
         }}
-        onBlockUncertain={() => setBlockState({ key: blockKey, value: null })}
+        onBlockUncertain={() => {
+          invalidateBlockQuery();
+          setBlockState({ key: blockKey, value: null });
+        }}
       />
     </>
   );

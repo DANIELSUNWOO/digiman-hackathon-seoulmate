@@ -33,6 +33,7 @@ import { house, airplane, photo_album } from "./art";
 import { ApiError } from "../../api";
 import {
   beginCompletion,
+  beginCompletionRetry,
   canResolveCompletion,
   completionConfirmed,
   completionKey,
@@ -124,6 +125,7 @@ export function SessionCompletionScreen({
   const pendingConfirm = useRef(false);
   const live = useRef({ identity, active: false, generation: 0 });
   live.current.identity = identity;
+  const renderedGeneration = live.current.generation;
   const draft = useRef({ identity, dirty: false });
   if (draft.current.identity !== identity)
     draft.current = { identity, dirty: false };
@@ -154,12 +156,17 @@ export function SessionCompletionScreen({
     [sheet, setSheet] = useState(false),
     [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  const [retryReady, setRetryReady] = useState(false);
+  const explicitRecheck = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
       live.current.active = true;
       live.current.generation += 1;
       let alive = true;
+      const requested = explicitRecheck.current;
+      explicitRecheck.current = false;
+      setRetryReady(false);
       const controller = new AbortController();
       const valid = () =>
         alive && live.current.active && live.current.identity === identity;
@@ -196,8 +203,21 @@ export function SessionCompletionScreen({
             completionConfirmed(editKey);
           needsCheck.current =
             completionPhase(key) !== null || completionPhase(editKey) !== null;
-          if (needsCheck.current)
-            setError("処理結果を確認中です。時間をおいて再確認してください。");
+          if (needsCheck.current) {
+            if (
+              requested &&
+              d.status === "ON_COURSE" &&
+              completionPhase(key) === "uncertain" &&
+              completionPhase(editKey) === null
+            ) {
+              setRetryReady(true);
+              setError("旅行を続けています。もう一度完了できます。");
+            } else {
+              setError(
+                "処理結果を確認中です。時間をおいて再確認してください。",
+              );
+            }
+          }
         })
         .catch(() => {
           if (valid())
@@ -211,6 +231,7 @@ export function SessionCompletionScreen({
         });
       return () => {
         alive = false;
+        pendingConfirm.current = false;
         live.current.active = false;
         live.current.generation += 1;
         controller.abort();
@@ -223,24 +244,33 @@ export function SessionCompletionScreen({
     needsCheck.current =
       completionPhase(key) !== null || completionPhase(editKey) !== null;
     pendingConfirm.current = false;
+    explicitRecheck.current = false;
+    setRetryReady(false);
     setTitle("");
     setCover(null);
   }, [identity, key, editKey]);
 
   const refresh = () => {
-    if (!busy.current) setRevision((n) => n + 1);
+    if (!busy.current) {
+      explicitRecheck.current = true;
+      setRevision((n) => n + 1);
+    }
   };
 
   const complete = async () => {
+    const retry = retryReady && completionPhase(key) === "uncertain";
     if (
       busy.current ||
-      needsCheck.current ||
+      (needsCheck.current && !retry) ||
       !live.current.active ||
+      live.current.identity !== identity ||
+      live.current.generation !== renderedGeneration ||
       !detail ||
       detail.status !== "ON_COURSE" ||
-      !beginCompletion(key)
+      !(retry ? beginCompletionRetry(key) : beginCompletion(key))
     )
       return;
+    setRetryReady(false);
     busy.current = true;
     needsCheck.current = true;
     setSheet(false);
@@ -525,7 +555,7 @@ export function SessionCompletionScreen({
         </Card>
       )}
 
-      {detail?.status === "ON_COURSE" && !error && (
+      {detail?.status === "ON_COURSE" && (!error || retryReady) && (
         <Card surface="muted" style={styles.onCourseCard}>
           <View style={styles.heroCircle}>
             <FlagCheckered size={26} color={theme.color.brandDeep} />
@@ -538,9 +568,9 @@ export function SessionCompletionScreen({
           </Label>
           <Button
             language="ja"
-            label="旅行を完了する"
+            label={retryReady ? "もう一度完了する" : "旅行を完了する"}
             onPress={() => setSheet(true)}
-            disabled={working || needsCheck.current}
+            disabled={working || (needsCheck.current && !retryReady)}
           />
         </Card>
       )}
@@ -708,13 +738,17 @@ export function SessionCompletionScreen({
                 if (
                   pendingConfirm.current ||
                   busy.current ||
-                  completionPhase(key)
+                  !live.current.active ||
+                  live.current.identity !== identity ||
+                  live.current.generation !== renderedGeneration ||
+                  (completionPhase(key) !== null &&
+                    !(retryReady && completionPhase(key) === "uncertain"))
                 )
                   return;
                 pendingConfirm.current = true;
                 setSheet(false);
               }}
-              disabled={working || needsCheck.current}
+              disabled={working || (needsCheck.current && !retryReady)}
             />
             <Button
               label="まだ続ける"

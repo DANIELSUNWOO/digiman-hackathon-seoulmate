@@ -16,6 +16,12 @@ export function beginCompletion(key: string, edit?: EditSnapshot): boolean {
   pending.set(key, { phase: "pending", edit });
   return true;
 }
+export function beginCompletionRetry(key: string): boolean {
+  const value = pending.get(key);
+  if (!value || value.phase !== "uncertain" || value.edit) return false;
+  pending.set(key, { phase: "pending" });
+  return true;
+}
 export function completionSettled(key: string): void {
   const value = pending.get(key);
   if (value?.phase === "pending")

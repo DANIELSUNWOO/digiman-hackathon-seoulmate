@@ -5,6 +5,7 @@ export type SafetyResult =
   "success" | "uncertain" | "already" | "failure" | "busy" | "stale";
 const uncertainReports = new Set<string>();
 const uncertainBlocks = new Set<string>();
+const confirmedBlocks = new Set<string>();
 const pendingOperations = new Map<string, object>();
 function key(account: string, match: number) {
   return `${account.toLowerCase()}:${match}`;
@@ -60,6 +61,16 @@ export class SafetyController {
   }
   isReportUncertain(account: string, matchId: number) {
     return uncertainReports.has(key(account, matchId));
+  }
+  isBlockUnresolved(account: string, matchId: number) {
+    const k = key(account, matchId);
+    return uncertainBlocks.has(k) || pendingOperations.has(`block:${k}`);
+  }
+  isBlockConfirmed(account: string, matchId: number) {
+    return confirmedBlocks.has(key(account, matchId));
+  }
+  noteBlockConfirmed(account: string, matchId: number) {
+    confirmedBlocks.add(key(account, matchId));
   }
   async report(
     account: string,
@@ -154,6 +165,7 @@ export class SafetyController {
       if (revision !== this.revision) return "stale";
       try {
         if (await this.api.blocked(token, partnerId)) {
+          confirmedBlocks.add(k);
           if (revision !== this.revision) return "stale";
           uncertainBlocks.delete(k);
           return "success";

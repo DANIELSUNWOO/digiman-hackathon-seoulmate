@@ -14,7 +14,7 @@ export const strings = {
   nameField: "스팟 이름",
   reviewField: "후기 (선택)",
   reviewPlaceholder: "가 보니 어땠나요?",
-  reasonField: "추천 이유",
+  reasonField: "추천 이유 (선택)",
   reasonPlaceholder: "여행자에게 권하는 이유를 알려 주세요",
   translated: "여행자에게는 일본어로 번역해 보여 줘요",
   save: "저장",

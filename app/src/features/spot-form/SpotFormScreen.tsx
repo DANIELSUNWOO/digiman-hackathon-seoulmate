@@ -34,8 +34,8 @@ export function SpotFormScreen({
 }: SpotFormScreenProps): ReactElement {
   const { photos, reason, review } = fields;
   const busy = saving.progress !== null;
-  // 서버는 이름과 사진만 요구한다. 추천 이유는 미리보기에 보여서 필수로 둔다.
-  const ready = !!location.name.trim() && photos.length > 0 && !!reason.trim();
+  // 서버(SPOT-01)와 같이 이름과 사진만 필수다.
+  const ready = !!location.name.trim() && photos.length > 0;
   return (
     <Screen>
       <AppBar title={title} language="ko" onBack={onBack} backDisabled={busy} />

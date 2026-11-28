@@ -57,7 +57,7 @@ export const strings = {
   noDraft: "만드는 중인 지도가 없어요",
   tagSpots: { before: "스팟", after: "곳" },
   tagPreviews: { before: "미리 공개", after: "곳" },
-  tagSelected: { before: "여행자", after: "명 선택" },
+  tagSelected: { before: "코스로 선택", after: "회" },
   publishGuide: "두 가지를 마치면 여행자에게 공개돼요.",
   stepSpots: (min: number) => `스팟 ${min}곳 이상 등록`,
   stepPreviews: (count: number) => `미리 공개 ${count}곳 고르기`,

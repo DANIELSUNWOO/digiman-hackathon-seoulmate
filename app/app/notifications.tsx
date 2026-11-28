@@ -14,8 +14,10 @@ export default function Notifications(): ReactElement | null {
   if (!ready) return null;
   if (!session) return <Redirect href="/auth" />;
   if (busy || load.kind === "loading") return null;
-  if (load.kind !== "ready" || nextStep(load.me))
-    return <Redirect href="/account" />;
+  if (load.kind !== "ready") return <Redirect href="/account" />;
+  // 여행 종료일이 지난 여행자는 "trip" 단계가 다시 남는다. 종료 알림은 볼 수 있어야 한다.
+  const step = nextStep(load.me);
+  if (step && step !== "trip") return <Redirect href="/account" />;
 
   return (
     <NotificationsScreen

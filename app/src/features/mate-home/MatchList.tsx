@@ -4,11 +4,12 @@ import { StyleSheet, Text, View } from "react-native";
 import { FlagJpIllustration } from "../../brandAssets";
 import { theme } from "../../theme";
 import { Card, Label, useFontFamily } from "../../ui";
+import { Avatar } from "../avatar";
 import { tripLabel } from "./endedTripModel";
 import { chatRemaining, sortByLastVisit } from "./model";
 import { ProgressBar } from "./ProgressBar";
+import { StatusPill } from "./StatusPill";
 import { strings } from "./strings";
-import { TravelerAvatar } from "./TravelerAvatar";
 import type { MatchItem } from "./types";
 
 export interface MatchListProps {
@@ -40,12 +41,11 @@ interface MatchCardProps {
 
 function MatchCard({ match, onPress }: MatchCardProps): ReactElement {
   const { partner, trip } = match;
-  const bold = useFontFamily("bold", "ko");
   return (
     <Card onPress={onPress}>
       <View style={styles.body}>
         <View style={styles.row}>
-          <TravelerAvatar url={partner.profileImageUrl ?? null} />
+          <Avatar url={partner.profileImageUrl ?? null} />
           <View style={styles.who}>
             <Label weight="bold" language="ja">
               {partner.nickname}
@@ -59,11 +59,7 @@ function MatchCard({ match, onPress }: MatchCardProps): ReactElement {
               </View>
             )}
           </View>
-          <View style={styles.pill}>
-            <Text style={[styles.pillText, { fontFamily: bold }]}>
-              {strings.tripPill}
-            </Text>
-          </View>
+          <StatusPill label={strings.tripPill} />
         </View>
         <Progress match={match} />
       </View>
@@ -109,16 +105,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: theme.space.md },
   who: { flex: 1 },
   meta: { flexDirection: "row", alignItems: "center", gap: theme.space.xs },
-  pill: {
-    paddingHorizontal: theme.space.sm,
-    borderRadius: theme.radius.status,
-    backgroundColor: theme.color.positiveSoft,
-  },
-  pillText: {
-    fontSize: theme.typography.status.fontSize,
-    lineHeight: theme.typography.status.lineHeight,
-    color: theme.color.positive,
-  },
   progress: { gap: theme.space.sm },
   between: {
     flexDirection: "row",

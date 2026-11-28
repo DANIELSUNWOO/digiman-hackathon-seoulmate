@@ -3,10 +3,12 @@ import type { ReactElement } from "react";
 import { StyleSheet, View } from "react-native";
 import { theme } from "../../theme";
 import { Label } from "../../ui";
+import { Avatar } from "../avatar";
 import { TranslatedText, type ViewerLang } from "../translation";
 import { ReportButton, type ReportTarget, type VisitComment } from "../visits";
-import { Avatar } from "./Avatar";
 import type { AlbumMember } from "./types";
+
+const AVATAR_SIZE = 28;
 
 export interface CommentBubbleProps {
   comment: VisitComment;
@@ -36,7 +38,8 @@ export function CommentBubble({
     <View style={styles.row}>
       <Avatar
         url={author?.profileImageUrl ?? null}
-        name={author?.nickname ?? ""}
+        size={AVATAR_SIZE}
+        label={author?.nickname}
       />
       <View style={[styles.bubble, styles.theirs]}>
         {author && (

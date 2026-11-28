@@ -10,6 +10,8 @@ export default function Map() {
       <MyMapsScreen
         onCreate={() => router.push("/maps/new")}
         onOpenMap={(mapId) => router.push(`/maps/${mapId}`)}
+        onAddSpot={(mapId) => router.push(`/maps/${mapId}/spots/new`)}
+        onPickPreviews={(mapId) => router.push(`/maps/${mapId}/previews`)}
       />
     );
   return (

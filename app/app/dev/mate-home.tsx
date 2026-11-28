@@ -151,6 +151,8 @@ function DevScreen({ api, view, onView }: DevScreenProps) {
         api={api}
         onCreate={() => onView({ name: "new" })}
         onOpenMap={showDetail}
+        onAddSpot={(mapId) => onView({ name: "addSpot", mapId })}
+        onPickPreviews={(mapId) => onView({ name: "previews", mapId })}
       />
     );
   if (view.name === "new")

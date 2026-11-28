@@ -14,17 +14,25 @@ import {
   createMockMateHomeApi,
   type MockScenario,
 } from "../../src/features/mate-home/mockApi";
+import { AddSpotFlow } from "../../src/features/spot-form";
+import {
+  mockPickPhoto,
+  mockSpotFormApi,
+} from "../../src/features/spot-form/mockApi";
+import { createMockPlaceSearchApi } from "../../src/features/place-search/mockApi";
 import { theme } from "../../src/theme";
 import { Chip } from "../../src/ui";
 
 const SCENARIOS: MockScenario[] = ["data", "empty", "error"];
+const mockPlaces = createMockPlaceSearchApi("data");
 
 type DevView =
   | { name: "home" }
   | { name: "maps" }
   | { name: "new" }
   | { name: "detail"; mapId: number }
-  | { name: "edit"; mapId: number };
+  | { name: "edit"; mapId: number }
+  | { name: "addSpot"; mapId: number };
 
 // 메이트 화면 확인용 경로. 로그인과 서버 없이 목 데이터로 본다. 개발 빌드에서만 열린다.
 export default function DevMateHome() {
@@ -94,15 +102,13 @@ function DevToolbar({
   );
 }
 
-function DevScreen({
-  api,
-  view,
-  onView,
-}: {
+interface DevScreenProps {
   api: MateHomeApi;
   view: DevView;
   onView: (view: DevView) => void;
-}) {
+}
+
+function DevScreen({ api, view, onView }: DevScreenProps) {
   const showMaps = () => onView({ name: "maps" });
   const showDetail = (mapId: number) => onView({ name: "detail", mapId });
   const router = useRouter();
@@ -125,23 +131,47 @@ function DevScreen({
     );
   if (view.name === "new")
     return <NewMapScreen api={api} onBack={showMaps} onCreated={showDetail} />;
+  return <DevMapScreen api={api} view={view} onView={onView} />;
+}
+
+// 지도 하나를 대상으로 하는 화면들
+function DevMapScreen({
+  api,
+  view,
+  onView,
+}: DevScreenProps & { view: Extract<DevView, { mapId: number }> }) {
   const { mapId } = view;
+  const showMaps = () => onView({ name: "maps" });
+  const showDetail = () => onView({ name: "detail", mapId });
+
   if (view.name === "detail")
     return (
       <MapDetailScreen
         api={api}
         mapId={mapId}
         onBack={showMaps}
+        onAddSpot={() => onView({ name: "addSpot", mapId })}
         onEdit={() => onView({ name: "edit", mapId })}
         onDeleted={showMaps}
+      />
+    );
+  if (view.name === "addSpot")
+    return (
+      <AddSpotFlow
+        mapId={mapId}
+        api={mockSpotFormApi}
+        placeApi={mockPlaces}
+        pickPhoto={mockPickPhoto}
+        onBack={showDetail}
+        onSaved={showDetail}
       />
     );
   return (
     <EditMapScreen
       api={api}
       mapId={mapId}
-      onBack={() => showDetail(mapId)}
-      onSaved={() => showDetail(mapId)}
+      onBack={showDetail}
+      onSaved={showDetail}
     />
   );
 }

@@ -1,4 +1,4 @@
-// M-10a 내 지도 상세: 스팟 목록, 수정·삭제. 스팟 등록은 Q-06·Q-07.
+// M-10a 내 지도 상세: 스팟 목록, 스팟 추가, 지도 수정·삭제.
 import { View } from "react-native";
 import { Button, Card, Label, Screen } from "../../ui";
 import { mateHomeApi, type MateHomeApi } from "./api";
@@ -15,12 +15,14 @@ export function MapDetailScreen({
   api = mateHomeApi,
   mapId,
   onBack,
+  onAddSpot,
   onEdit,
   onDeleted,
 }: {
   api?: MateHomeApi;
   mapId: number;
   onBack: () => void;
+  onAddSpot: () => void;
   onEdit: () => void;
   onDeleted: () => void;
 }) {
@@ -37,11 +39,8 @@ export function MapDetailScreen({
         <>
           <MapSummary map={state.data.map} />
           <SpotList spots={state.data.map.spots} />
-          {/* 스팟 위치 선택 화면(Q-06)이 생기면 활성화한다. */}
-          <Button label={strings.addSpot} language="ko" disabled />
-          <Label center language="ko">
-            {strings.addSpotPending}
-          </Label>
+          {/* 여행 중인 여행자가 있어도 새 스팟 추가는 된다. */}
+          <Button label={strings.addSpot} language="ko" onPress={onAddSpot} />
           {state.data.locked ? (
             <Label center language="ko">
               {strings.locked}

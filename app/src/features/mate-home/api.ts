@@ -6,6 +6,7 @@ import type {
   MatchItem,
   MateProfile,
   MyMap,
+  VisitSummary,
 } from "./types";
 
 export type MateHomeApi = {
@@ -13,6 +14,8 @@ export type MateHomeApi = {
   getMyMaps: () => Promise<MyMap[]>;
   getActiveMatches: () => Promise<MatchItem[]>;
   getEndedMatches: () => Promise<EndedMatch[]>;
+  /** VISIT-02. 최근 인증 순 */
+  getVisits: (matchId: number) => Promise<VisitSummary[]>;
   getMapDetail: (mapId: number) => Promise<MapDetail>;
   createMap: (input: MapInput) => Promise<{ mapId: number }>;
   /** 바뀐 값만 보낸다. 한 줄 소개(caption)를 보내면 서버가 번역을 다시 한다. */
@@ -35,6 +38,8 @@ export const mateHomeApi: MateHomeApi = {
   getMyMaps: () => apiRequest<MyMap[]>("maps/me"),
   getActiveMatches: () => apiRequest<MatchItem[]>("matches?state=active"),
   getEndedMatches: () => apiRequest<EndedMatch[]>("matches?state=ended"),
+  getVisits: (matchId) =>
+    apiRequest<VisitSummary[]>(`matches/${matchId}/visits`),
   getMapDetail: (mapId) => apiRequest<MapDetail>(`maps/${mapId}`),
   createMap: (input) =>
     apiRequest<{ mapId: number }>("maps", jsonRequest("POST", input)),

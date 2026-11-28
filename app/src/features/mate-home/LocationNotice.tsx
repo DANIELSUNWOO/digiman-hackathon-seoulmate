@@ -1,10 +1,10 @@
 // M-20 위치 안내. X로 닫으면 이 기기에서 다시 보여 주지 않는다.
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { X } from "phosphor-react-native";
+import { Info, X } from "phosphor-react-native";
 import { useEffect, useState, type ReactElement } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { theme } from "../../theme";
-import { Notice } from "../../ui";
+import { Label } from "../../ui";
 import { strings } from "./strings";
 
 const CLOSED_KEY = "mateHome.locationNoticeClosed";
@@ -37,8 +37,11 @@ export function LocationNotice(): ReactElement | null {
   };
   return (
     <View style={styles.row}>
+      <Info size={theme.size.iconInline} color={theme.color.labelDesc} />
       <View style={styles.notice}>
-        <Notice language="ko">{strings.locationNotice}</Notice>
+        <Label variant="caption" tone="neutral" language="ko">
+          {strings.locationNotice}
+        </Label>
       </View>
       <Pressable
         accessibilityRole="button"
@@ -46,14 +49,21 @@ export function LocationNotice(): ReactElement | null {
         onPress={close}
         style={styles.close}
       >
-        <X size={theme.size.iconSmall} color={theme.color.muted} />
+        <X size={theme.size.iconInline} color={theme.color.labelDesc} />
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: theme.space.xs },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.space.sm,
+    paddingLeft: theme.space.md,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.color.surface2,
+  },
   notice: { flex: 1 },
   close: {
     width: theme.size.touchMin,

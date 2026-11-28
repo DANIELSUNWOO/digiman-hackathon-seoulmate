@@ -1,5 +1,7 @@
 // API 명세 v1.7(USER-01, MAP-02, MATCH-02)과 서버 DTO 기준. 이 화면에서 쓰는 필드만 둔다.
 
+import type { VisitRecord } from "../visits";
+
 export type LocalizedText = {
   original: string;
   translated: string | null;
@@ -47,6 +49,7 @@ export type MapInput = { title: string; caption: string };
 
 /** GET /users/me 중 메이트 홈에서 쓰는 부분 */
 export type MateProfile = {
+  nickname?: string;
   // 서버는 메이트 계정에만 내려준다. 기기에 저장된 역할과 계정이 다르면 없다.
   matchCapacity?: { active: number; max: number };
 };
@@ -55,7 +58,7 @@ export type MateProfile = {
 export type MatchItem = {
   matchId: number;
   chatStatus: "LOCKED" | "READY" | "OPEN";
-  partner: { nickname: string };
+  partner: { nickname: string; profileImageUrl?: string | null };
   courseMap: { mapId: number; title: string } | null;
   progress: {
     visited: number;
@@ -65,6 +68,12 @@ export type MatchItem = {
   trip: TripRange | null;
   lastVisitAt: string | null;
 };
+
+/** VISIT-02 항목 중 홈의 최근 방문에서 쓰는 부분 */
+export type VisitSummary = Pick<
+  VisitRecord,
+  "visitId" | "spot" | "photoUrl" | "verifiedAt"
+>;
 
 export type TripRange = { startDate: string; endDate: string };
 

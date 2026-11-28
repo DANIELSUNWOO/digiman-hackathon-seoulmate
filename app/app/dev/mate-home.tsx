@@ -16,6 +16,8 @@ import {
   type MockScenario,
 } from "../../src/features/mate-home/mockApi";
 import { AddSpotFlow, SpotEditScreen } from "../../src/features/spot-form";
+import { NotificationBell } from "../../src/features/notifications";
+import { createMockNotificationsApi } from "../../src/features/notifications/mockApi";
 import {
   mockPickPhoto,
   mockSpotFormApi,
@@ -32,6 +34,7 @@ const SCENARIOS: MockScenario[] = [
   "error",
 ];
 const mockPlaces = createMockPlaceSearchApi("data");
+const mockNotifications = createMockNotificationsApi("data", "ko");
 
 type DevView =
   | { name: "home" }
@@ -126,11 +129,20 @@ function DevScreen({ api, view, onView }: DevScreenProps) {
     return (
       <MateHomeScreen
         api={api}
+        headerRight={
+          <NotificationBell
+            api={mockNotifications}
+            lang="ko"
+            onPress={() => {}}
+          />
+        }
         // 방문 기록은 별도 목 화면에서 본다 (매칭 번호와 무관한 같은 목 데이터).
         onOpenVisits={() => router.push("/dev/visits")}
         onOpenAlbum={() => router.push("/dev/album")}
         onOpenMap={showDetail}
         onCreateMap={() => onView({ name: "new" })}
+        onPickPreviews={(mapId) => onView({ name: "previews", mapId })}
+        onOpenMyMaps={showMaps}
       />
     );
   if (view.name === "maps")

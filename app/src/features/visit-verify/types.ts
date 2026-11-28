@@ -43,12 +43,19 @@ export interface VisitRequest {
   lng: number;
 }
 
+/** VISIT-01의 진행 상황. required는 채팅에 필요한 인증 수다. */
+export interface Progress {
+  visited: number;
+  required: number | null;
+  total: number;
+}
+
 /** VISIT-01 응답 */
 export interface VisitCreated {
   visitId: number;
   spotId: number;
   verifiedAt: string;
-  progress: { visited: number; required: number; total: number };
+  progress: Progress;
   chatReady: boolean;
 }
 

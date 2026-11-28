@@ -34,7 +34,8 @@ export function VerifyForm({
     if (photo) void flow.start({ photo, review: content });
   };
 
-  if (flow.state.status === "done") return <VerifyDone onBack={onDone} />;
+  if (flow.state.status === "done")
+    return <VerifyDone progress={flow.state.result.progress} onBack={onDone} />;
 
   return (
     <>

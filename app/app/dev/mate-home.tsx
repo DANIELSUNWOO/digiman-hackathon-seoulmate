@@ -1,4 +1,4 @@
-import { Redirect } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -105,8 +105,16 @@ function DevScreen({
 }) {
   const showMaps = () => onView({ name: "maps" });
   const showDetail = (mapId: number) => onView({ name: "detail", mapId });
+  const router = useRouter();
 
-  if (view.name === "home") return <MateHomeScreen api={api} />;
+  if (view.name === "home")
+    return (
+      <MateHomeScreen
+        api={api}
+        // 방문 기록은 별도 목 화면에서 본다 (매칭 번호와 무관한 같은 목 데이터).
+        onOpenVisits={() => router.push("/dev/visits")}
+      />
+    );
   if (view.name === "maps")
     return (
       <MyMapsScreen

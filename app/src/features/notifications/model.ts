@@ -2,10 +2,11 @@ import type { Href } from "expo-router";
 import type { NotificationItem, NotificationPage } from "./types";
 
 /**
- * 알림을 눌렀을 때 이동할 곳. 방문 기록·채팅·앨범 화면이 아직 없어 모두 홈이다.
- * 화면이 생기면 여기에서 type별로 나눈다 (API 명세 v1.7 알림 표).
+ * 알림을 눌렀을 때 이동할 곳 (API 명세 알림 표). 화면이 없는 type은 홈이다.
+ * REACTION은 방문 기록에 리액션이 보이게 되는 Q-14에서 연결한다.
  */
-export function destinationFor(_item: NotificationItem): Href {
+export function destinationFor({ type, matchId }: NotificationItem): Href {
+  if (type === "VISIT" && matchId !== null) return `/matches/${matchId}/visits`;
   return "/(tabs)";
 }
 

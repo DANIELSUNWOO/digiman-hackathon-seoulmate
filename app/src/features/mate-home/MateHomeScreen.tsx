@@ -1,5 +1,6 @@
-// M-20 메이트 홈: 매칭 현황과 여행자 목록. 알림(NOTI-02)은 Q-15에서 붙인다.
-import { useCallback } from "react";
+// M-20 메이트 홈: 매칭 현황과 여행자 목록.
+import { useCallback, type ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
 import { Card, Label, Screen } from "../../ui";
 import { mateHomeApi, type MateHomeApi } from "./api";
 import { LoadError, Loading } from "./LoadStatus";
@@ -8,7 +9,18 @@ import { strings } from "./strings";
 import type { MatchItem, MateProfile } from "./types";
 import { useLoad } from "./useLoad";
 
-export function MateHomeScreen({ api = mateHomeApi }: { api?: MateHomeApi }) {
+export interface MateHomeScreenProps {
+  api?: MateHomeApi;
+  /** 제목 오른쪽에 둘 것 (알림 종) */
+  headerRight?: ReactNode;
+  onOpenVisits: (matchId: number) => void;
+}
+
+export function MateHomeScreen({
+  api = mateHomeApi,
+  headerRight,
+  onOpenVisits,
+}: MateHomeScreenProps) {
   const load = useCallback(
     () => Promise.all([api.getProfile(), api.getActiveMatches()]),
     [api],
@@ -17,15 +29,22 @@ export function MateHomeScreen({ api = mateHomeApi }: { api?: MateHomeApi }) {
 
   return (
     <Screen>
-      <Label title language="ko">
-        {strings.homeTitle}
-      </Label>
+      <View style={styles.header}>
+        <Label title language="ko">
+          {strings.homeTitle}
+        </Label>
+        {headerRight}
+      </View>
       {state.status === "loading" && <Loading />}
       {state.status === "error" && (
         <LoadError error={state.error} onRetry={retry} />
       )}
       {state.status === "ready" && (
-        <MatchList profile={state.data[0]} matches={state.data[1]} />
+        <MatchList
+          profile={state.data[0]}
+          matches={state.data[1]}
+          onOpenVisits={onOpenVisits}
+        />
       )}
     </Screen>
   );
@@ -34,9 +53,11 @@ export function MateHomeScreen({ api = mateHomeApi }: { api?: MateHomeApi }) {
 function MatchList({
   profile,
   matches,
+  onOpenVisits,
 }: {
   profile: MateProfile;
   matches: MatchItem[];
+  onOpenVisits: (matchId: number) => void;
 }) {
   const capacity = profile.matchCapacity;
   return (
@@ -49,9 +70,8 @@ function MatchList({
       {matches.length === 0 && (
         <Label language="ko">{strings.matchEmpty}</Label>
       )}
-      {/* 방문 기록 화면(Q-13)이 생기면 카드에 이동을 붙인다. */}
       {sortByLastVisit(matches).map((match) => (
-        <Card key={match.matchId}>
+        <Card key={match.matchId} onPress={() => onOpenVisits(match.matchId)}>
           <Label weight="bold" language="ja">
             {match.partner.nickname}
           </Label>
@@ -65,3 +85,11 @@ function MatchList({
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+});

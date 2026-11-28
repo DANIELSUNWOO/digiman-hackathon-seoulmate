@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../src/loading";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { CaretLeft, MagnifyingGlass, X } from "phosphor-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -644,11 +645,10 @@ export default function TagsScreen() {
         )}
 
         {loading ? (
-          <View style={styles.statusWrap}>
-            <Notice language={language}>
-              {ko ? "취향을 불러오는 중입니다" : "好みを読み込んでいます"}
-            </Notice>
-          </View>
+          <LoadingSkeleton
+            shape="chips"
+            label={ko ? "취향을 불러오는 중입니다" : "好みを読み込んでいます"}
+          />
         ) : null}
 
         {!!error && (
@@ -683,7 +683,7 @@ export default function TagsScreen() {
           </View>
         )}
 
-        {tree && (
+        {!loading && tree && (
           <>
             <View style={styles.headingBlock}>
               <Label variant="titleBig" language={language}>

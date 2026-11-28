@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../loading";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { ScrollView, View, Text } from "react-native";
@@ -60,7 +61,7 @@ export function TravelerHome() {
           />
         </>
       )}
-      {!matches && !error && <Label>読み込み中...</Label>}
+      {!matches && !error && <LoadingSkeleton label="ホームを読み込み中" />}
       {matches && (
         <>
           <View

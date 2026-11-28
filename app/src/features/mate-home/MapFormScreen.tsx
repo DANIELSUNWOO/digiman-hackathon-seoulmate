@@ -60,7 +60,7 @@ export function EditMapScreen({
       <Label title language="ko">
         {strings.editMapTitle}
       </Label>
-      {state.status === "loading" && <Loading />}
+      {state.status === "loading" && <Loading shape="form" />}
       {state.status === "error" && (
         <LoadError error={state.error} onRetry={retry} />
       )}

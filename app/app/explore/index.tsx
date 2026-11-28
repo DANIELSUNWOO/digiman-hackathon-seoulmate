@@ -10,6 +10,7 @@ import {
 } from "../../src/features/map-browse";
 import { PinRange } from "../../src/features/map-browse/PinRange";
 import { EmptyIllustration } from "../../src/features/map-browse/EmptyIllustration";
+import { LoadingSkeleton } from "../../src/loading";
 import { theme } from "../../src/theme";
 import { useSession } from "../../src/session";
 import { BottomSheet, Button, Card, Label, Screen } from "../../src/ui";
@@ -85,7 +86,12 @@ export default function Browse() {
     await pending;
     if (generation.current === current) refreshView();
   }
-  const result = state.result;
+  const sameAccount = state.accountId === account;
+  const filters = sameAccount ? state.filters : {};
+  const result = sameAccount ? state.result : null;
+  const stale =
+    !!result && JSON.stringify(filters) !== JSON.stringify(state.resultFilters);
+  const updating = state.loading && state.loadingPage === 0;
   return (
     <Screen>
       <Button
@@ -97,11 +103,11 @@ export default function Browse() {
       />
       <Label title>地図を選ぶ</Label>
       <Label>エリア</Label>
-      {state.filters.areaTagId !== undefined && (
+      {filters.areaTagId !== undefined && (
         <Button
           secondary
           label="エリアを解除"
-          onPress={() => void apply({ ...state.filters, areaTagId: undefined })}
+          onPress={() => void apply({ ...filters, areaTagId: undefined })}
         />
       )}
       <View
@@ -114,59 +120,66 @@ export default function Browse() {
           borderRadius: 16,
         }}
       >
-        {result?.areas.map((area) => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{
-              selected: state.filters.areaTagId === area.tagId,
-            }}
-            key={area.tagId}
-            onPress={() =>
-              void apply({
-                ...state.filters,
-                areaTagId:
-                  state.filters.areaTagId === area.tagId
-                    ? undefined
-                    : area.tagId,
-              })
-            }
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 20,
-              backgroundColor:
-                state.filters.areaTagId === area.tagId
-                  ? theme.color.brandTint
-                  : theme.color.surface,
-            }}
-          >
-            <Label>
-              {area.name} {area.mapCount}
-            </Label>
-          </Pressable>
-        ))}
+        {!stale &&
+          result?.areas.map((area) => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{
+                selected: filters.areaTagId === area.tagId,
+              }}
+              key={area.tagId}
+              onPress={() =>
+                void apply({
+                  ...filters,
+                  areaTagId:
+                    filters.areaTagId === area.tagId ? undefined : area.tagId,
+                })
+              }
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 20,
+                backgroundColor:
+                  filters.areaTagId === area.tagId
+                    ? theme.color.brandTint
+                    : theme.color.surface,
+              }}
+            >
+              <Label>
+                {area.name} {area.mapCount}
+              </Label>
+            </Pressable>
+          ))}
       </View>
       <Button
         secondary
         label="絞り込みと並び順"
         onPress={() => {
-          setDraft({ ...state.filters });
+          setDraft({ ...filters });
           setSheetOpen(true);
         }}
       />
-      {state.loading && <Label>読み込み中...</Label>}
-      {state.error != null && (
+      {(state.loading || !sameAccount) && !result && (
+        <LoadingSkeleton label="地図を読み込み中" />
+      )}
+      {updating && result && (
+        <Label>前の結果を表示しています。更新中です。</Label>
+      )}
+      {stale && !state.loading && (
+        <Label>更新できませんでした。前の条件の結果を表示しています。</Label>
+      )}
+      {sameAccount && state.error != null && (
         <>
           <Label>読み込めませんでした</Label>
           <Button
             secondary
             label="再試行"
-            onPress={() => void apply(state.filters)}
+            onPress={() => void apply(filters)}
           />
         </>
       )}
-      {result && <Label>{result.totalCount}件</Label>}
-      {result?.emptyReason === "NO_MATE" && (
+      {result && !stale && !updating && <Label>{result.totalCount}件</Label>}
+      {!stale && !updating && result?.emptyReason === "NO_MATE" && (
         <>
           <View style={{ alignItems: "center", gap: 12 }}>
             <EmptyIllustration />
@@ -194,7 +207,7 @@ export default function Browse() {
           />
         </>
       )}
-      {result?.emptyReason === "NO_MAP_IN_RANGE" && (
+      {!stale && !updating && result?.emptyReason === "NO_MAP_IN_RANGE" && (
         <View style={{ alignItems: "center", gap: 12 }}>
           <EmptyIllustration />
           <Label title center>
@@ -212,7 +225,11 @@ export default function Browse() {
         <Card
           key={item.mapId}
           selected={item.myMatchId !== null}
-          onPress={() => router.push(`/explore/${item.mapId}`)}
+          onPress={
+            stale || updating
+              ? undefined
+              : () => router.push(`/explore/${item.mapId}`)
+          }
         >
           <Label weight="bold">
             {item.title.translated || item.title.original}
@@ -226,7 +243,10 @@ export default function Browse() {
           </Label>
         </Card>
       ))}
-      {result?.hasNext && (
+      {state.loading && state.loadingPage !== 0 && (
+        <Label>続きを読み込み中です</Label>
+      )}
+      {result?.hasNext && !stale && (
         <Button
           secondary
           label="もっと見る"

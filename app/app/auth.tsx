@@ -23,7 +23,7 @@ import { useSession } from "../src/session";
 import { noticeMessage } from "../src/authMessages";
 
 function SeoulHeroPlaceholder() {
-  // Temporary daylight Seoul skyline placeholder pending final designer photo.
+  // SVG placeholder until the selected Hangang and Lotte Tower photo is connected.
   return (
     <View style={s.heroWrap}>
       <Svg

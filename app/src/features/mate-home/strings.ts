@@ -26,7 +26,7 @@ export const strings = {
   spotSection: "스팟",
   spotEmpty: "아직 등록한 스팟이 없어요",
   spotPreview: "공개 스팟",
-  spotReview: (text: string) => `후기 · ${text}`,
+  spotReview: (text: string) => `소개 · ${text}`,
   spotReason: (text: string) => `추천 이유 · ${text}`,
   addSpot: "스팟 추가",
   exposed: "노출 중",

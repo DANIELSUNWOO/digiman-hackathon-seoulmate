@@ -45,4 +45,8 @@ export const strings = {
   errorSpotNotFound: "스팟을 찾을 수 없어요",
   errorPreviewLocked: "공개 스팟은 바로 고치거나 지울 수 없어요",
   errorSpotInUse: "방문 기록이 있는 스팟은 삭제할 수 없어요",
+  errorSavedHere: (name: string) =>
+    `‘${name}’ 스팟은 이미 저장됐어요. 지금 고친 내용은 반영되지 않았으니 지도에서 확인해 주세요`,
+  errorSavedBefore: (name: string) =>
+    `이전에 저장한 ‘${name}’ 스팟은 이미 등록됐어요. 지금 장소는 아직 저장하지 않았어요. 다시 저장하면 새로 등록해요`,
 } as const;

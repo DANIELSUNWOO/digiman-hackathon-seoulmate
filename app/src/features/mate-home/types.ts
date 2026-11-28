@@ -64,3 +64,14 @@ export type MatchItem = {
   } | null;
   lastVisitAt: string | null;
 };
+
+export type TripRange = { startDate: string; endDate: string };
+
+/** GET /matches?state=ended 항목. 차단당한 쪽에는 status가 ENDED로 온다. */
+export type EndedMatch = {
+  matchId: number;
+  status: "COMPLETED" | "CANCELED" | "EXPIRED" | "BLOCKED" | "ENDED";
+  partner: { nickname: string };
+  courseMap: { mapId: number; title: string } | null;
+  trip: TripRange | null;
+};

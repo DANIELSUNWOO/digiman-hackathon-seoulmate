@@ -1,5 +1,6 @@
 import { apiRequest } from "../../api";
 import type {
+  EndedMatch,
   MapDetail,
   MapInput,
   MatchItem,
@@ -11,6 +12,7 @@ export type MateHomeApi = {
   getProfile: () => Promise<MateProfile>;
   getMyMaps: () => Promise<MyMap[]>;
   getActiveMatches: () => Promise<MatchItem[]>;
+  getEndedMatches: () => Promise<EndedMatch[]>;
   getMapDetail: (mapId: number) => Promise<MapDetail>;
   createMap: (input: MapInput) => Promise<{ mapId: number }>;
   /** 바뀐 값만 보낸다. 캡션을 보내면 서버가 번역을 다시 한다. */
@@ -32,6 +34,7 @@ export const mateHomeApi: MateHomeApi = {
   getProfile: () => apiRequest<MateProfile>("users/me"),
   getMyMaps: () => apiRequest<MyMap[]>("maps/me"),
   getActiveMatches: () => apiRequest<MatchItem[]>("matches?state=active"),
+  getEndedMatches: () => apiRequest<EndedMatch[]>("matches?state=ended"),
   getMapDetail: (mapId) => apiRequest<MapDetail>(`maps/${mapId}`),
   createMap: (input) =>
     apiRequest<{ mapId: number }>("maps", jsonRequest("POST", input)),

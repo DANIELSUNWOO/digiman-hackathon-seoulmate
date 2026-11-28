@@ -1,5 +1,5 @@
 // 개발 전용 목 데이터.
-import type { MapSpot, MatchItem, MyMap } from "./types";
+import type { EndedMatch, MapSpot, MatchItem, MyMap } from "./types";
 
 export const MAPS: MyMap[] = [
   {
@@ -103,3 +103,27 @@ export function mockSpots(map: MyMap): MapSpot[] {
     isPreview: index < map.previewCount,
   }));
 }
+
+export const ENDED_MATCHES: EndedMatch[] = [
+  {
+    matchId: 91,
+    status: "EXPIRED",
+    partner: { nickname: "さくら" },
+    courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
+    trip: { startDate: "2026-11-10", endDate: "2026-11-14" },
+  },
+  {
+    matchId: 92,
+    status: "COMPLETED",
+    partner: { nickname: "はると" },
+    courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
+    trip: { startDate: "2026-10-29", endDate: "2026-11-21" },
+  },
+  {
+    matchId: 93,
+    status: "CANCELED",
+    partner: { nickname: "취소된 여행자" },
+    courseMap: null,
+    trip: null,
+  },
+];

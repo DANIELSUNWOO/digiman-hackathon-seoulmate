@@ -8,6 +8,11 @@ export interface SpotRequest extends SpotLocation {
   review: string;
 }
 
+/** SPOT-02 요청 본문. 바꾼 값만 보낸다. */
+export type SpotChanges = Partial<
+  Pick<SpotRequest, "name" | "photoUrls" | "reason" | "review">
+>;
+
 export interface SpotCreated {
   spotId: number;
   spotCount: number;

@@ -1,8 +1,8 @@
 import { ApiError } from "../../api";
-import { UploadError } from "../photo-upload";
 import type { SpotFormApi } from "./api";
 import { createDuplicateGuard, type Attempt } from "./duplicateGuard";
 import type { SpotInput, SpotRequest, SubmitSpot } from "./types";
+import { createUploader } from "./uploader";
 
 /** 서버가 저장했는지 알 수 없는 실패 */
 function isUnknownOutcome(error: unknown): boolean {
@@ -21,23 +21,6 @@ function toRequest(
     photoUrls,
     reason: reason.trim(),
     review: review.trim(),
-  };
-}
-
-/** 이미 올린 사진은 다시 시도할 때 또 올리지 않는다. */
-function createUploader(api: SpotFormApi): (uri: string) => Promise<string> {
-  const uploaded = new Map<string, string>();
-  return async (uri) => {
-    const known = uploaded.get(uri);
-    if (known) return known;
-    try {
-      const url = await api.uploadPhoto(uri);
-      uploaded.set(uri, url);
-      return url;
-    } catch (error: unknown) {
-      // 네트워크·세션 문제는 그 안내를 그대로 쓴다.
-      throw error instanceof ApiError ? error : new UploadError(error);
-    }
   };
 }
 
@@ -61,12 +44,7 @@ export function createSpotSubmit(api: SpotFormApi, mapId: number): SubmitSpot {
   return async (input, onProgress) => {
     const attempt = toAttempt(input);
     if (await guard.isSaved(attempt)) return;
-    const photoUrls: string[] = [];
-    const total = input.photos.length;
-    for (const [index, { uri }] of input.photos.entries()) {
-      onProgress({ stage: "uploading", index: index + 1, total });
-      photoUrls.push(await upload(uri));
-    }
+    const photoUrls = await upload(input.photos, onProgress);
     onProgress({ stage: "saving" });
     try {
       await api.createSpot(mapId, toRequest(input, photoUrls));

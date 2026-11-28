@@ -8,6 +8,8 @@ const SERVER_MESSAGES: Record<string, string> = {
   MAP_IN_USE: strings.errorMapInUse,
   MAP_LOCKED: strings.errorMapLocked,
   VALIDATION_ERROR: strings.errorValidation,
+  PREVIEW_COUNT_INVALID: strings.errorPreviewCount,
+  SPOT_NOT_IN_MAP: strings.errorSpotChanged,
 };
 
 /** 화면 문구는 서버 message가 아니라 code로 앱이 정한다. */

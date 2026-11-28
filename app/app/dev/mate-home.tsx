@@ -8,13 +8,14 @@ import {
   MateHomeScreen,
   MyMapsScreen,
   NewMapScreen,
+  PreviewSelectScreen,
 } from "../../src/features/mate-home";
 import type { MateHomeApi } from "../../src/features/mate-home/api";
 import {
   createMockMateHomeApi,
   type MockScenario,
 } from "../../src/features/mate-home/mockApi";
-import { AddSpotFlow } from "../../src/features/spot-form";
+import { AddSpotFlow, SpotEditScreen } from "../../src/features/spot-form";
 import {
   mockPickPhoto,
   mockSpotFormApi,
@@ -32,7 +33,9 @@ type DevView =
   | { name: "new" }
   | { name: "detail"; mapId: number }
   | { name: "edit"; mapId: number }
-  | { name: "addSpot"; mapId: number };
+  | { name: "addSpot"; mapId: number }
+  | { name: "spot"; mapId: number; spotId: number }
+  | { name: "previews"; mapId: number };
 
 // 메이트 화면 확인용 경로. 로그인과 서버 없이 목 데이터로 본다. 개발 빌드에서만 열린다.
 export default function DevMateHome() {
@@ -141,20 +144,10 @@ function DevMapScreen({
   onView,
 }: DevScreenProps & { view: Extract<DevView, { mapId: number }> }) {
   const { mapId } = view;
-  const showMaps = () => onView({ name: "maps" });
   const showDetail = () => onView({ name: "detail", mapId });
 
   if (view.name === "detail")
-    return (
-      <MapDetailScreen
-        api={api}
-        mapId={mapId}
-        onBack={showMaps}
-        onAddSpot={() => onView({ name: "addSpot", mapId })}
-        onEdit={() => onView({ name: "edit", mapId })}
-        onDeleted={showMaps}
-      />
-    );
+    return <DevDetail api={api} mapId={mapId} onView={onView} />;
   if (view.name === "addSpot")
     return (
       <AddSpotFlow
@@ -166,12 +159,41 @@ function DevMapScreen({
         onSaved={showDetail}
       />
     );
+  if (view.name === "spot")
+    return (
+      <SpotEditScreen
+        mapId={mapId}
+        spotId={view.spotId}
+        mapApi={api}
+        api={mockSpotFormApi}
+        pickPhoto={mockPickPhoto}
+        onBack={showDetail}
+        onDone={showDetail}
+        onChangePreviews={() => onView({ name: "previews", mapId })}
+      />
+    );
+  const Target = view.name === "previews" ? PreviewSelectScreen : EditMapScreen;
   return (
-    <EditMapScreen
+    <Target api={api} mapId={mapId} onBack={showDetail} onSaved={showDetail} />
+  );
+}
+
+function DevDetail({
+  api,
+  mapId,
+  onView,
+}: Omit<DevScreenProps, "view"> & { mapId: number }) {
+  const showMaps = () => onView({ name: "maps" });
+  return (
+    <MapDetailScreen
       api={api}
       mapId={mapId}
-      onBack={showDetail}
-      onSaved={showDetail}
+      onBack={showMaps}
+      onAddSpot={() => onView({ name: "addSpot", mapId })}
+      onOpenSpot={(spotId) => onView({ name: "spot", mapId, spotId })}
+      onPickPreviews={() => onView({ name: "previews", mapId })}
+      onEdit={() => onView({ name: "edit", mapId })}
+      onDeleted={showMaps}
     />
   );
 }

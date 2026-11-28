@@ -29,6 +29,26 @@ export const strings = {
   spotReview: (text: string) => `소개 · ${text}`,
   spotReason: (text: string) => `추천 이유 · ${text}`,
   addSpot: "스팟 추가",
+  exposureSection: "노출 조건",
+  exposureSpots: (count: number, min: number) =>
+    `스팟 ${min}곳 이상 · 지금 ${count}곳`,
+  exposurePreviews: (count: number, required: number) =>
+    `공개 스팟 ${required}곳 · 지금 ${count}곳`,
+  met: "충족",
+  unmet: "미충족",
+  pickPreviews: "공개 스팟 고르기",
+  previewsTitle: "공개 스팟",
+  previewsGuide:
+    "여행자가 지도를 고르기 전에 볼 수 있는 2곳이에요. 가장 자신 있는 곳을 골라 주세요",
+  previewsLockNotice:
+    "공개 스팟은 다른 곳으로 바꾸기 전에는 고치거나 지울 수 없어요",
+  previewsNeedSpots: "스팟을 2곳 이상 등록하면 고를 수 있어요",
+  previewsLocked: "여행 중인 여행자가 있어 공개 스팟을 바꿀 수 없어요",
+  previewsFull: "2곳까지만 고를 수 있어요. 바꾸려면 먼저 하나를 해제해 주세요",
+  previewSelected: "선택됨",
+  previewRemaining: (count: number) => `${count}곳 더 고르세요`,
+  errorPreviewCount: "공개 스팟은 2곳을 골라 주세요",
+  errorSpotChanged: "스팟 목록이 바뀌었어요. 다시 들어와 주세요",
   exposed: "노출 중",
   hidden: "노출 안 됨",
   loading: "불러오는 중",

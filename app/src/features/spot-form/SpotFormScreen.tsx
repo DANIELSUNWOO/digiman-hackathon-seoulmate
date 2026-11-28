@@ -1,5 +1,5 @@
-// M-13 스팟 정보 입력. 입력값과 저장 상태는 흐름(AddSpotFlow)이 갖고 있다.
-import type { ReactElement } from "react";
+// M-13 스팟 정보 입력. 등록과 수정이 함께 쓰며 입력값과 저장 상태는 부른 쪽이 갖고 있다.
+import type { ReactElement, ReactNode } from "react";
 import { AppBar, Button, ErrorNotice, Label, Screen } from "../../ui";
 import type { PickPhoto } from "../photo-upload";
 import type { SpotLocation } from "../spot-location";
@@ -11,6 +11,9 @@ import type { SpotFields } from "./useSpotFields";
 import type { SpotSave } from "./useSpotSave";
 
 export interface SpotFormScreenProps {
+  title?: string;
+  /** 저장 버튼 아래에 붙는 내용 */
+  footer?: ReactNode;
   location: SpotLocation;
   fields: SpotFields;
   saving: SpotSave;
@@ -20,6 +23,8 @@ export interface SpotFormScreenProps {
 }
 
 export function SpotFormScreen({
+  title = strings.title,
+  footer,
   location,
   fields,
   saving,
@@ -29,16 +34,11 @@ export function SpotFormScreen({
 }: SpotFormScreenProps): ReactElement {
   const { photos, reason, review } = fields;
   const busy = saving.progress !== null;
-  // 서버는 이름과 사진만 요구한다. 추천 이유는 미리보기에 보여서 필수로 둔다.
-  const ready = !!location.name.trim() && photos.length > 0 && !!reason.trim();
+  // 서버(SPOT-01)와 같이 이름과 사진만 필수다.
+  const ready = !!location.name.trim() && photos.length > 0;
   return (
     <Screen>
-      <AppBar
-        title={strings.title}
-        language="ko"
-        onBack={onBack}
-        backDisabled={busy}
-      />
+      <AppBar title={title} language="ko" onBack={onBack} backDisabled={busy} />
       {location.address !== null && (
         <Label language="ko" variant="desc">
           {location.address}
@@ -61,6 +61,7 @@ export function SpotFormScreen({
         disabled={busy || !ready}
         onPress={() => void saving.save({ location, photos, reason, review })}
       />
+      {footer}
     </Screen>
   );
 }

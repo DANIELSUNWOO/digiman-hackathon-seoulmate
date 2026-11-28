@@ -1,14 +1,7 @@
 import { ApiError } from "../../api";
+import { UploadError } from "../photo-upload";
 import type { VisitVerifyApi } from "./api";
 import type { SubmitVisit } from "./types";
-
-/** 사진을 올리지 못한 실패. 인증 API의 실패와 안내를 나눈다. */
-export class UploadError extends Error {
-  constructor(public cause: unknown) {
-    super("photo upload failed");
-    this.name = "UploadError";
-  }
-}
 
 /** 업로드한 뒤 인증한다. 인증만 실패하면 다시 시도할 때 사진을 또 올리지 않는다. */
 export function createSubmit(

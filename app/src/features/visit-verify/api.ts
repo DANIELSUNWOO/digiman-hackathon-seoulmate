@@ -1,6 +1,6 @@
 import { apiRequest } from "../../api";
+import { uploadPhoto } from "../photo-upload";
 import type { CourseSpot, VisitCreated, VisitRequest } from "./types";
-import { uploadVisitPhoto } from "./upload";
 
 export interface VisitVerifyApi {
   /** MATCH-06에서 스팟 하나를 찾는다. 코스에 없으면 null */
@@ -18,7 +18,7 @@ export const visitVerifyApi: VisitVerifyApi = {
     );
     return spots.find((spot) => spot.spotId === spotId) ?? null;
   },
-  uploadPhoto: uploadVisitPhoto,
+  uploadPhoto: (uri) => uploadPhoto("visit", uri),
   verify: (matchId, request) =>
     apiRequest<VisitCreated>(`matches/${matchId}/visits`, {
       method: "POST",

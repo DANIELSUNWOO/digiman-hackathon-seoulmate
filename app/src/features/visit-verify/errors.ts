@@ -1,6 +1,6 @@
 import { ApiError } from "../../api";
+import { UploadError } from "../photo-upload";
 import { strings } from "./strings";
-import { UploadError } from "./submission";
 
 const SERVER_MESSAGES: Record<string, string> = {
   NOT_MATCH_MEMBER: strings.errorForbidden,

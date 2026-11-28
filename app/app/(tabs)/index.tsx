@@ -17,6 +17,7 @@ export default function Home() {
           />
         }
         onOpenVisits={(matchId) => router.push(`/matches/${matchId}/visits`)}
+        onOpenAlbum={(matchId) => router.push(`/matches/${matchId}/album`)}
       />
     );
   return <TravelerHome />;

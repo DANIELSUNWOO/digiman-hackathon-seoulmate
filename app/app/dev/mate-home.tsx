@@ -113,6 +113,7 @@ function DevScreen({
         api={api}
         // 방문 기록은 별도 목 화면에서 본다 (매칭 번호와 무관한 같은 목 데이터).
         onOpenVisits={() => router.push("/dev/visits")}
+        onOpenAlbum={() => router.push("/dev/album")}
       />
     );
   if (view.name === "maps")

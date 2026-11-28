@@ -3,6 +3,7 @@ import { useCallback, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { Card, Label, Screen } from "../../ui";
 import { mateHomeApi, type MateHomeApi } from "./api";
+import { EndedTrips } from "./EndedTrips";
 import { LoadError, Loading } from "./LoadStatus";
 import { progressLabel, sortByLastVisit, visitTimeLabel } from "./model";
 import { strings } from "./strings";
@@ -14,12 +15,14 @@ export interface MateHomeScreenProps {
   /** 제목 오른쪽에 둘 것 (알림 종) */
   headerRight?: ReactNode;
   onOpenVisits: (matchId: number) => void;
+  onOpenAlbum: (matchId: number) => void;
 }
 
 export function MateHomeScreen({
   api = mateHomeApi,
   headerRight,
   onOpenVisits,
+  onOpenAlbum,
 }: MateHomeScreenProps) {
   const load = useCallback(
     () => Promise.all([api.getProfile(), api.getActiveMatches()]),
@@ -40,11 +43,14 @@ export function MateHomeScreen({
         <LoadError error={state.error} onRetry={retry} />
       )}
       {state.status === "ready" && (
-        <MatchList
-          profile={state.data[0]}
-          matches={state.data[1]}
-          onOpenVisits={onOpenVisits}
-        />
+        <>
+          <MatchList
+            profile={state.data[0]}
+            matches={state.data[1]}
+            onOpenVisits={onOpenVisits}
+          />
+          <EndedTrips api={api} onOpenAlbum={onOpenAlbum} />
+        </>
       )}
     </Screen>
   );

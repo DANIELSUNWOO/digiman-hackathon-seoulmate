@@ -1,7 +1,7 @@
 // 개발 전용 경로(/dev/mate-home)에서 서버 없이 화면 상태를 확인하기 위한 목.
 import { ApiError } from "../../api";
 import type { MateHomeApi } from "./api";
-import { MAPS, MATCHES, mockSpots } from "./mockData";
+import { ENDED_MATCHES, MAPS, MATCHES, mockSpots } from "./mockData";
 import type { MapDetail, MapInput, MyMap } from "./types";
 
 export type MockScenario = "data" | "empty" | "error";
@@ -95,6 +95,8 @@ export function createMockMateHomeApi(scenario: MockScenario): MateHomeApi {
         matchCapacity: { active: matches.length, max: 10 },
       })),
     getActiveMatches: () => respond(() => matches),
+    getEndedMatches: () =>
+      respond(() => (scenario === "data" ? ENDED_MATCHES : [])),
     getMyMaps: () => respond(store.list),
     getMapDetail: (mapId) => respond(() => store.detail(mapId)),
     createMap: (input) => respond(() => store.create(input)),

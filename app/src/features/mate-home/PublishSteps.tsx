@@ -61,7 +61,8 @@ function Step({
   const done = count >= required;
   const medium = useFontFamily("medium", "ko");
   const bold = useFontFamily("bold", "ko");
-  const tone = done || disabled ? styles.muted : null;
+  // 끝난 줄은 흐리게, 아직 못 누르는 줄은 더 흐리게 둔다.
+  const tone = disabled ? styles.off : done ? styles.muted : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -74,7 +75,9 @@ function Step({
         {done && <Check size={12} color={theme.color.surface} weight="bold" />}
       </View>
       <Text style={[styles.label, { fontFamily: medium }, tone]}>{label}</Text>
-      <Text style={[styles.count, { fontFamily: medium }]}>
+      <Text
+        style={[styles.count, { fontFamily: medium }, disabled && styles.off]}
+      >
         <Text style={[styles.value, { fontFamily: bold }, tone]}>
           {Math.min(count, required)}
         </Text>
@@ -82,7 +85,7 @@ function Step({
       </Text>
       <CaretRight
         size={theme.size.iconInline}
-        color={theme.color.labelAssist}
+        color={disabled ? theme.color.labelDisable : theme.color.labelAssist}
       />
     </Pressable>
   );
@@ -129,4 +132,5 @@ const styles = StyleSheet.create({
     color: theme.color.brandDeep,
   },
   muted: { color: theme.color.labelDesc },
+  off: { color: theme.color.labelAssist },
 });

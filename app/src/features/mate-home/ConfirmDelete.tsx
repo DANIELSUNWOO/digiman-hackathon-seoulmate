@@ -2,7 +2,7 @@
 import { useRef, useState, type ReactElement } from "react";
 import { View } from "react-native";
 import { theme } from "../../theme";
-import { BottomSheet, Button, Label } from "../../ui";
+import { BottomSheet, Button, Label, TextLink } from "../../ui";
 import { strings } from "./strings";
 import { useIsMounted } from "./useIsMounted";
 
@@ -12,6 +12,8 @@ export interface ConfirmDeleteProps {
   title: string;
   warning: string;
   disabled?: boolean;
+  /** 시트를 여는 자리를 버튼 대신 글자 링크로 둔다. */
+  link?: boolean;
   onDelete: () => Promise<void>;
   onDeleted: () => void;
   errorText: (cause: unknown) => string;
@@ -54,19 +56,24 @@ function useConfirmDelete({
   return { open, show: () => setOpen(true), close, remove, deleting, error };
 }
 
+function Trigger({
+  label,
+  disabled,
+  link,
+  onPress,
+}: ConfirmDeleteProps & { onPress: () => void }): ReactElement {
+  const shared = { label, disabled, onPress };
+  if (link) return <TextLink {...shared} language="ko" variant="quiet" />;
+  return <Button {...shared} language="ko" secondary />;
+}
+
 /** 삭제는 확인을 받은 뒤에만 실행한다. react-native-web의 Alert는 동작하지 않아 BottomSheet를 쓴다. */
 export function ConfirmDelete(props: ConfirmDeleteProps): ReactElement {
   const { open, show, close, remove, deleting, error } =
     useConfirmDelete(props);
   return (
     <>
-      <Button
-        label={props.label}
-        language="ko"
-        secondary
-        disabled={props.disabled}
-        onPress={show}
-      />
+      <Trigger {...props} onPress={show} />
       <BottomSheet visible={open} onClose={close}>
         <View style={{ gap: theme.space.md }}>
           <Label weight="bold" center language="ko">

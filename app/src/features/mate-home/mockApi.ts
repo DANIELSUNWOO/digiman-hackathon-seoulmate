@@ -100,5 +100,7 @@ export function createMockMateHomeApi(scenario: MockScenario): MateHomeApi {
     createMap: (input) => respond(() => store.create(input)),
     updateMap: (mapId, changes) => respond(() => store.update(mapId, changes)),
     deleteMap: (mapId) => respond(() => store.remove(mapId)),
+    // 목 스팟은 저장하지 않아 선택 결과가 상세에 남지 않는다.
+    setPreviews: () => respond(() => undefined),
   };
 }

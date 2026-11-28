@@ -2,8 +2,8 @@ import { strings } from "./strings";
 import type { MapInput, MatchItem, MyMap } from "./types";
 
 // 서버 정책값의 앱 사본. 부족한 조건을 안내하는 데만 쓰고, 노출 판정은 서버의 isPublic을 따른다.
-const MAP_MIN_SPOTS = 5;
-const MAP_PREVIEW_SPOTS = 2;
+export const MAP_MIN_SPOTS = 5;
+export const MAP_PREVIEW_SPOTS = 2;
 export const MAP_TITLE_MAX = 30;
 export const MAP_CAPTION_MAX = 300;
 

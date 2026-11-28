@@ -25,6 +25,9 @@ export type MapSpot = {
   spotId: number;
   name: string;
   address: string | null;
+  lat: number;
+  lng: number;
+  photos: string[];
   reason: LocalizedText | null;
   review: LocalizedText | null;
   isPreview: boolean;

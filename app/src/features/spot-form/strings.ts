@@ -14,7 +14,7 @@ export const strings = {
   nameField: "스팟 이름",
   reviewField: "소개 (선택)",
   reviewPlaceholder: "어떤 곳인지 소개해 주세요",
-  reasonField: "추천 이유",
+  reasonField: "추천 이유 (선택)",
   reasonPlaceholder: "여행자에게 권하는 이유를 알려 주세요",
   translated: "여행자에게는 일본어로 번역해 보여 줘요",
   save: "저장",
@@ -30,6 +30,21 @@ export const strings = {
   errorLocked: "여행 중인 여행자가 있어 지금은 바꿀 수 없어요",
   errorValidation: "입력한 내용을 확인해 주세요",
   errorDefault: "저장하지 못했어요. 다시 시도해 주세요",
+  editTitle: "스팟 수정",
+  editLocked:
+    "여행 중인 여행자가 있어 이 스팟은 고치거나 지울 수 없어요. 새 스팟 추가는 할 수 있어요",
+  editPreview:
+    "공개 스팟은 바로 고치거나 지울 수 없어요. 다른 곳을 공개로 바꾼 뒤 해 주세요",
+  editPreviewNeedsSpot: "스팟을 더 등록하면 공개 스팟을 바꿀 수 있어요",
+  changePreviews: "공개 스팟 바꾸기",
+  remove: "스팟 삭제",
+  removeConfirm: "스팟을 삭제할까요?",
+  removeWarning: "사진과 글도 함께 지워져요",
+  errorRemove: "삭제하지 못했어요. 다시 시도해 주세요",
+  errorPhotoRequired: "사진을 1장 이상 올려 주세요",
+  errorSpotNotFound: "스팟을 찾을 수 없어요",
+  errorPreviewLocked: "공개 스팟은 바로 고치거나 지울 수 없어요",
+  errorSpotInUse: "방문 기록이 있는 스팟은 삭제할 수 없어요",
   errorSavedHere: (name: string) =>
     `‘${name}’ 스팟은 이미 저장됐어요. 지금 고친 내용은 반영되지 않았으니 지도에서 확인해 주세요`,
   errorSavedBefore: (name: string) =>

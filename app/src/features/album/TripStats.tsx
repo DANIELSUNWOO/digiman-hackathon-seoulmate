@@ -3,10 +3,12 @@ import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { theme } from "../../theme";
 import { Label, useFontFamily } from "../../ui";
+import { Avatar } from "../avatar";
 import type { ViewerLang } from "../translation";
-import { Avatar } from "./Avatar";
 import { strings } from "./strings";
 import type { AlbumMember } from "./types";
+
+const AVATAR_SIZE = 28;
 
 export interface TripStatsProps {
   lang: ViewerLang;
@@ -41,7 +43,7 @@ export function TripStats({
       />
       {partner && (
         <View style={styles.cell}>
-          <Avatar url={partner.profileImageUrl} name={partner.nickname} />
+          <Avatar url={partner.profileImageUrl} size={AVATAR_SIZE} />
           {/* 상대의 언어: 메이트가 보는 여행자는 일본어, 반대는 한국어. */}
           <Label
             language={lang === "ko" ? "ja" : "ko"}

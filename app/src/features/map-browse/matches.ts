@@ -7,6 +7,7 @@ export type ActiveMatch = {
   mapId: number | null;
   title: string;
   partner: string | null;
+  chatStatus: "LOCKED" | "READY" | "OPEN" | null;
   visited: number | null;
   required: number | null;
   total: number | null;
@@ -77,6 +78,12 @@ export function parseActiveMatches(value: unknown): ActiveMatch[] {
       mapId,
       title: display,
       partner: typeof partner === "string" ? partner : null,
+      chatStatus:
+        v.chatStatus === "LOCKED" ||
+        v.chatStatus === "READY" ||
+        v.chatStatus === "OPEN"
+          ? v.chatStatus
+          : null,
       visited,
       required,
       total,

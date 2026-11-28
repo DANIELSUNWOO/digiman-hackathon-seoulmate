@@ -1,10 +1,22 @@
 // 개발 전용 경로(/dev/mate-home)에서 서버 없이 화면 상태를 확인하기 위한 목.
 import { ApiError } from "../../api";
 import type { MateHomeApi } from "./api";
-import { ENDED_MATCHES, MAPS, MATCHES, mockSpots } from "./mockData";
+import {
+  ENDED_MATCHES,
+  MAPS,
+  MATCHES,
+  mockSpots,
+  mockVisits,
+} from "./mockData";
 import type { MapDetail, MapInput, MyMap } from "./types";
 
-export type MockScenario = "data" | "empty" | "error";
+/** noMatch: 노출 중인 지도만 있고 매칭 없음. draft: 미완성 지도만 있음 */
+export type MockScenario = "data" | "noMatch" | "draft" | "empty" | "error";
+
+function mockMaps(scenario: MockScenario): MyMap[] {
+  if (scenario === "data" || scenario === "noMatch") return MAPS;
+  return scenario === "draft" ? MAPS.filter((map) => !map.isPublic) : [];
+}
 
 function serverError(status: number, code: string) {
   return new ApiError("HTTP", "mock server error", status, { code });
@@ -76,7 +88,7 @@ function createMapStore(initial: MyMap[]) {
 }
 
 export function createMockMateHomeApi(scenario: MockScenario): MateHomeApi {
-  const store = createMapStore(scenario === "data" ? MAPS : []);
+  const store = createMapStore(mockMaps(scenario));
   const matches = scenario === "data" ? MATCHES : [];
   const respond = <T>(action: () => T): Promise<T> =>
     new Promise((resolve, reject) => {
@@ -92,11 +104,13 @@ export function createMockMateHomeApi(scenario: MockScenario): MateHomeApi {
   return {
     getProfile: () =>
       respond(() => ({
+        nickname: "지우",
         matchCapacity: { active: matches.length, max: 10 },
       })),
     getActiveMatches: () => respond(() => matches),
     getEndedMatches: () =>
       respond(() => (scenario === "data" ? ENDED_MATCHES : [])),
+    getVisits: (matchId) => respond(() => mockVisits(matchId)),
     getMyMaps: () => respond(store.list),
     getMapDetail: (mapId) => respond(() => store.detail(mapId)),
     createMap: (input) => respond(() => store.create(input)),

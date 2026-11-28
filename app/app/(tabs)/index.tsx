@@ -10,6 +10,10 @@ export default function Home() {
   if (role === "mate")
     return (
       <MateHomeScreen
+        onOpenMap={(mapId) => router.push(`/maps/${mapId}`)}
+        onCreateMap={() => router.push("/maps/new")}
+        onPickPreviews={(mapId) => router.push(`/maps/${mapId}/previews`)}
+        onOpenMyMaps={() => router.push("/map")}
         headerRight={
           <NotificationBell
             lang="ko"

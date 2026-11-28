@@ -1,5 +1,6 @@
 export { destinationFor, timeLabel } from "./model";
 export {
+  BellColorContext,
   NotificationBell,
   type NotificationBellProps,
 } from "./NotificationBell";

@@ -16,6 +16,8 @@ export type MateHomeApi = {
   /** 바뀐 값만 보낸다. 캡션을 보내면 서버가 번역을 다시 한다. */
   updateMap: (mapId: number, changes: Partial<MapInput>) => Promise<unknown>;
   deleteMap: (mapId: number) => Promise<void>;
+  /** MAP-06. 정확히 2곳이며 기존 공개 스팟을 바꾼다. */
+  setPreviews: (mapId: number, spotIds: number[]) => Promise<unknown>;
 };
 
 function jsonRequest(method: string, body: unknown): RequestInit {
@@ -36,4 +38,6 @@ export const mateHomeApi: MateHomeApi = {
   updateMap: (mapId, changes) =>
     apiRequest(`maps/${mapId}`, jsonRequest("PATCH", changes)),
   deleteMap: (mapId) => apiRequest<void>(`maps/${mapId}`, { method: "DELETE" }),
+  setPreviews: (mapId, spotIds) =>
+    apiRequest(`maps/${mapId}/previews`, jsonRequest("PUT", { spotIds })),
 };

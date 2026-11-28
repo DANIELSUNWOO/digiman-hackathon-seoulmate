@@ -15,11 +15,15 @@ export interface SpotFields {
   removePhoto: (uri: string) => void;
 }
 
-/** 장소를 다시 고르러 가도 남도록 흐름 쪽에서 보관한다. */
-export function useSpotFields(): SpotFields {
-  const [photos, setPhotos] = useState<PickedPhoto[]>([]);
-  const [reason, setReason] = useState("");
-  const [review, setReview] = useState("");
+export type SpotValues = Pick<SpotFields, "photos" | "reason" | "review">;
+
+const EMPTY: SpotValues = { photos: [], reason: "", review: "" };
+
+/** 장소를 다시 고르러 가도 남도록 흐름 쪽에서 보관한다. 수정할 때는 저장된 값으로 시작한다. */
+export function useSpotFields(initial: SpotValues = EMPTY): SpotFields {
+  const [photos, setPhotos] = useState<PickedPhoto[]>(initial.photos);
+  const [reason, setReason] = useState(initial.reason);
+  const [review, setReview] = useState(initial.review);
 
   const addPhoto = (photo: PickedPhoto): void => {
     setPhotos((previous) =>

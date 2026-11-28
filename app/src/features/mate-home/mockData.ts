@@ -77,11 +77,19 @@ export const MATCHES: MatchItem[] = [
   },
 ];
 
+function mockPhoto(index: number): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" data-spot="${index}"><rect width="1" height="1" fill="#477EFF"/></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 export function mockSpots(map: MyMap): MapSpot[] {
   return Array.from({ length: map.spotCount }, (_, index) => ({
     spotId: map.mapId * 100 + index,
     name: `${map.title} ${index + 1}번 스팟`,
     address: "서울 성동구 아차산로9길 8",
+    lat: 37.5447,
+    lng: 127.0582,
+    photos: [mockPhoto(index)],
     reason: {
       original: "창가 자리가 조용해요",
       translated: null,

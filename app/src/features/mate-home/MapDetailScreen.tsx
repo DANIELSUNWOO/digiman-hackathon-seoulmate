@@ -1,31 +1,31 @@
-// M-10a 내 지도 상세: 스팟 목록, 스팟 추가, 지도 수정·삭제.
+// M-10a 내 지도 상세: 노출 조건, 스팟 목록, 스팟 추가·공개 지정, 지도 수정·삭제.
 import { View } from "react-native";
-import { Button, Card, Label, Screen } from "../../ui";
+import { Button, Label, Screen } from "../../ui";
 import { mateHomeApi, type MateHomeApi } from "./api";
 import { BackButton } from "./BackButton";
 import { DeleteMap } from "./DeleteMap";
 import { ExposureBadge } from "./ExposureBadge";
+import { ExposureChecklist } from "./ExposureChecklist";
 import { LoadError, Loading } from "./LoadStatus";
-import { previewLabel, spotLabel } from "./model";
+import { MAP_PREVIEW_SPOTS } from "./model";
+import { SpotList } from "./SpotList";
 import { strings } from "./strings";
-import type { MapDetail, MapSpot } from "./types";
+import type { MapDetail } from "./types";
 import { useMapWithLock } from "./useMapWithLock";
 
-export function MapDetailScreen({
-  api = mateHomeApi,
-  mapId,
-  onBack,
-  onAddSpot,
-  onEdit,
-  onDeleted,
-}: {
+type Props = {
   api?: MateHomeApi;
   mapId: number;
   onBack: () => void;
   onAddSpot: () => void;
+  onOpenSpot: (spotId: number) => void;
+  onPickPreviews: () => void;
   onEdit: () => void;
   onDeleted: () => void;
-}) {
+};
+
+export function MapDetailScreen(props: Props) {
+  const { api = mateHomeApi, mapId, onBack, onOpenSpot } = props;
   const { state, retry } = useMapWithLock(api, mapId);
 
   return (
@@ -38,24 +38,9 @@ export function MapDetailScreen({
       {state.status === "ready" && (
         <>
           <MapSummary map={state.data.map} />
-          <SpotList spots={state.data.map.spots} />
-          {/* 여행 중인 여행자가 있어도 새 스팟 추가는 된다. */}
-          <Button label={strings.addSpot} language="ko" onPress={onAddSpot} />
-          {state.data.locked ? (
-            <Label center language="ko">
-              {strings.locked}
-            </Label>
-          ) : (
-            <>
-              <Button
-                label={strings.edit}
-                language="ko"
-                secondary
-                onPress={onEdit}
-              />
-              <DeleteMap api={api} mapId={mapId} onDeleted={onDeleted} />
-            </>
-          )}
+          {/* 공개·잠긴 스팟도 눌러서 이유를 볼 수 있다. */}
+          <SpotList spots={state.data.map.spots} onOpenSpot={onOpenSpot} />
+          <MapActions {...props} api={api} {...state.data} />
         </>
       )}
     </Screen>
@@ -63,8 +48,6 @@ export function MapDetailScreen({
 }
 
 function MapSummary({ map }: { map: MapDetail }) {
-  const spotCount = map.spots.length;
-  const previewCount = map.spots.filter((spot) => spot.isPreview).length;
   return (
     <View>
       <ExposureBadge isPublic={map.isPublic} />
@@ -74,44 +57,51 @@ function MapSummary({ map }: { map: MapDetail }) {
       {!!map.caption?.original && (
         <Label language="ko">{map.caption.original}</Label>
       )}
-      <Label language="ko">
-        {`${spotLabel({ spotCount })} · ${previewLabel({ previewCount })}`}
-      </Label>
+      <ExposureChecklist
+        spotCount={map.spots.length}
+        previewCount={map.spots.filter((spot) => spot.isPreview).length}
+      />
     </View>
   );
 }
 
-function SpotList({ spots }: { spots: MapSpot[] }) {
+type ActionsProps = Props & {
+  api: MateHomeApi;
+  map: MapDetail;
+  locked: boolean;
+};
+
+function MapActions({ api, mapId, map, locked, ...actions }: ActionsProps) {
   return (
     <>
-      <Label weight="bold" language="ko">
-        {strings.spotSection}
-      </Label>
-      {spots.length === 0 && <Label language="ko">{strings.spotEmpty}</Label>}
-      {/* 스팟 수정 화면(Q-08)이 생기면 카드에 이동을 붙인다. */}
-      {spots.map((spot) => (
-        <Card key={spot.spotId}>
-          <Label weight="bold" language="ko">
-            {spot.name}
-          </Label>
-          {!!spot.address && <Label language="ko">{spot.address}</Label>}
-          {!!spot.review?.original && (
-            <Label language="ko">
-              {strings.spotReview(spot.review.original)}
-            </Label>
-          )}
-          {!!spot.reason?.original && (
-            <Label language="ko">
-              {strings.spotReason(spot.reason.original)}
-            </Label>
-          )}
-          {spot.isPreview && (
-            <Label weight="medium" language="ko">
-              {strings.spotPreview}
-            </Label>
-          )}
-        </Card>
-      ))}
+      {/* 여행 중인 여행자가 있어도 새 스팟 추가는 된다. */}
+      <Button
+        label={strings.addSpot}
+        language="ko"
+        onPress={actions.onAddSpot}
+      />
+      {locked ? (
+        <Label center language="ko">
+          {strings.locked}
+        </Label>
+      ) : (
+        <>
+          <Button
+            label={strings.pickPreviews}
+            language="ko"
+            secondary
+            disabled={map.spots.length < MAP_PREVIEW_SPOTS}
+            onPress={actions.onPickPreviews}
+          />
+          <Button
+            label={strings.edit}
+            language="ko"
+            secondary
+            onPress={actions.onEdit}
+          />
+          <DeleteMap api={api} mapId={mapId} onDeleted={actions.onDeleted} />
+        </>
+      )}
     </>
   );
 }

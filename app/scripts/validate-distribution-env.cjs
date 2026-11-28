@@ -1,7 +1,8 @@
 // EAS standard build hook only. Do not print environment values or connect to services.
 const net = require("node:net");
 
-const blocked = new net.BlockList();
+const blockedIPv4 = new net.BlockList();
+const blockedIPv6 = new net.BlockList();
 for (const [network, prefix] of [
   ["0.0.0.0", 8],
   ["10.0.0.0", 8],
@@ -17,7 +18,7 @@ for (const [network, prefix] of [
   ["224.0.0.0", 4],
   ["240.0.0.0", 4],
 ])
-  blocked.addSubnet(network, prefix, "ipv4");
+  blockedIPv4.addSubnet(network, prefix, "ipv4");
 for (const [network, prefix] of [
   ["::", 128],
   ["::1", 128],
@@ -27,7 +28,7 @@ for (const [network, prefix] of [
   ["2001:db8::", 32],
   ["::ffff:0:0", 96],
 ])
-  blocked.addSubnet(network, prefix, "ipv6");
+  blockedIPv6.addSubnet(network, prefix, "ipv6");
 
 function publicHttps(value) {
   if (typeof value !== "string" || value !== value.trim() || !value)
@@ -51,7 +52,8 @@ function publicHttps(value) {
     .replace(/^\[|\]$/g, "")
     .replace(/\.$/, "");
   const family = net.isIP(host);
-  if (family) return !blocked.check(host, family === 4 ? "ipv4" : "ipv6");
+  if (family === 4) return !blockedIPv4.check(host, "ipv4");
+  if (family === 6) return !blockedIPv6.check(host, "ipv6");
   if (!host.includes(".")) return false;
   if (
     /(^|\.)(localhost|local|lan|internal|invalid|test|example)(\.|$)/.test(host)

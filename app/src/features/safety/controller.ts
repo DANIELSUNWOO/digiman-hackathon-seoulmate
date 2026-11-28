@@ -5,6 +5,10 @@ export type SafetyResult =
   "success" | "uncertain" | "already" | "failure" | "busy" | "stale";
 const uncertainReports = new Set<string>();
 const uncertainBlocks = new Set<string>();
+const blockPayloads = new Map<
+  string,
+  { reason: string; detail: string; partnerId: string }
+>();
 const confirmedBlocks = new Set<string>();
 const pendingOperations = new Map<string, object>();
 function key(account: string, match: number) {
@@ -68,6 +72,18 @@ export class SafetyController {
   }
   isBlockConfirmed(account: string, matchId: number) {
     return confirmedBlocks.has(key(account, matchId));
+  }
+  getUncertainBlockPayload(
+    account: string,
+    matchId: number,
+    partnerId: string,
+  ) {
+    const k = key(account, matchId);
+    const saved = blockPayloads.get(k);
+    return uncertainBlocks.has(k) &&
+      saved?.partnerId.toLowerCase() === partnerId.toLowerCase()
+      ? saved
+      : null;
   }
   noteBlockConfirmed(account: string, matchId: number) {
     confirmedBlocks.add(key(account, matchId));
@@ -133,6 +149,7 @@ export class SafetyController {
     partnerId: string,
     reason: string,
     detail: string,
+    retryUncertain = false,
   ): Promise<SafetyResult> {
     validateReason(reason, detail);
     if (
@@ -151,14 +168,42 @@ export class SafetyController {
     this.busy = true;
     const revision = this.revision;
     try {
+      const retrying = uncertainBlocks.has(k) && retryUncertain;
+      if (uncertainBlocks.has(k) && retryUncertain) {
+        const saved = blockPayloads.get(k);
+        if (
+          !saved ||
+          saved.partnerId.toLowerCase() !== partnerId.toLowerCase() ||
+          saved.reason !== reason ||
+          saved.detail !== detail
+        )
+          return "failure";
+        try {
+          if (await this.api.blocked(token, partnerId)) {
+            confirmedBlocks.add(k);
+            uncertainBlocks.delete(k);
+            blockPayloads.delete(k);
+            return revision === this.revision ? "success" : "stale";
+          }
+        } catch {
+          return revision === this.revision ? "uncertain" : "stale";
+        }
+        if (revision !== this.revision || !this.active) return "stale";
+        // A false read permits only the explicit, same-payload retry below.
+        uncertainBlocks.delete(k);
+      }
       if (!uncertainBlocks.has(k)) {
+        blockPayloads.set(k, { reason, detail, partnerId });
         try {
           await this.api.block(token, matchId, reason, detail);
         } catch (error) {
           const code = (error as { serverError?: { code?: string } })
             ?.serverError?.code;
-          if (definite(error) && code !== "ALREADY_BLOCKED")
+          if (definite(error) && code !== "ALREADY_BLOCKED") {
+            if (retrying) uncertainBlocks.add(k);
+            else blockPayloads.delete(k);
             return revision === this.revision ? "failure" : "stale";
+          }
         }
         uncertainBlocks.add(k);
       }
@@ -168,6 +213,7 @@ export class SafetyController {
           confirmedBlocks.add(k);
           if (revision !== this.revision) return "stale";
           uncertainBlocks.delete(k);
+          blockPayloads.delete(k);
           return "success";
         }
       } catch {

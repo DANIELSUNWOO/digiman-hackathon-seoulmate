@@ -22,6 +22,20 @@ export function beginCompletionRetry(key: string): boolean {
   pending.set(key, { phase: "pending" });
   return true;
 }
+export function beginEditRetry(key: string, expected: EditSnapshot): boolean {
+  const value = pending.get(key);
+  const edit = value?.edit;
+  if (
+    value?.phase !== "uncertain" ||
+    !edit ||
+    edit.albumId !== expected.albumId ||
+    edit.title !== expected.title ||
+    edit.coverUrl !== expected.coverUrl
+  )
+    return false;
+  pending.set(key, { phase: "pending", edit });
+  return true;
+}
 export function completionSettled(key: string): void {
   const value = pending.get(key);
   if (value?.phase === "pending")

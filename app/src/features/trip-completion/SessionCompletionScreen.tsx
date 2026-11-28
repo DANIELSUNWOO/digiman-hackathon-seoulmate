@@ -34,6 +34,9 @@ import { ApiError } from "../../api";
 import {
   beginCompletion,
   beginCompletionRetry,
+  beginEditRetry,
+  pendingEdit,
+  type EditSnapshot,
   canResolveCompletion,
   completionConfirmed,
   completionKey,
@@ -123,6 +126,7 @@ export function SessionCompletionScreen({
   }, [preparing, reducedMotion, pulse, journey]);
 
   const pendingConfirm = useRef(false);
+  const pendingEditConfirm = useRef(false);
   const live = useRef({ identity, active: false, generation: 0 });
   live.current.identity = identity;
   const renderedGeneration = live.current.generation;
@@ -157,6 +161,8 @@ export function SessionCompletionScreen({
     [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const [retryReady, setRetryReady] = useState(false);
+  const [editRetry, setEditRetry] = useState<EditSnapshot | null>(null);
+  const [editSheet, setEditSheet] = useState(false);
   const explicitRecheck = useRef(false);
 
   useFocusEffect(
@@ -167,6 +173,8 @@ export function SessionCompletionScreen({
       const requested = explicitRecheck.current;
       explicitRecheck.current = false;
       setRetryReady(false);
+      setEditRetry(null);
+      setPreparing(false);
       const controller = new AbortController();
       const valid = () =>
         alive && live.current.active && live.current.identity === identity;
@@ -204,7 +212,18 @@ export function SessionCompletionScreen({
           needsCheck.current =
             completionPhase(key) !== null || completionPhase(editKey) !== null;
           if (needsCheck.current) {
+            const previous = pendingEdit(editKey);
             if (
+              requested &&
+              a &&
+              completionPhase(key) === null &&
+              completionPhase(editKey) === "uncertain" &&
+              previous &&
+              previous.albumId === a.albumId
+            ) {
+              setEditRetry(previous);
+              setError("保存内容を確認してください。もう一度保存できます。");
+            } else if (
               requested &&
               d.status === "ON_COURSE" &&
               completionPhase(key) === "uncertain" &&
@@ -232,6 +251,8 @@ export function SessionCompletionScreen({
       return () => {
         alive = false;
         pendingConfirm.current = false;
+        pendingEditConfirm.current = false;
+        setEditSheet(false);
         live.current.active = false;
         live.current.generation += 1;
         controller.abort();
@@ -244,6 +265,9 @@ export function SessionCompletionScreen({
     needsCheck.current =
       completionPhase(key) !== null || completionPhase(editKey) !== null;
     pendingConfirm.current = false;
+    pendingEditConfirm.current = false;
+    setEditSheet(false);
+    setEditRetry(null);
     explicitRecheck.current = false;
     setRetryReady(false);
     setTitle("");
@@ -355,6 +379,97 @@ export function SessionCompletionScreen({
             : "完了結果を確認できません。再確認してください。",
         );
     } finally {
+      if (current()) {
+        busy.current = false;
+        setWorking(false);
+      }
+    }
+  };
+
+  const retryAlbumEdit = async () => {
+    const wanted = editRetry;
+    if (
+      !wanted ||
+      busy.current ||
+      !album ||
+      album.albumId !== wanted.albumId ||
+      !live.current.active ||
+      live.current.identity !== identity ||
+      live.current.generation !== renderedGeneration ||
+      completionPhase(key) !== null ||
+      completionPhase(editKey) !== "uncertain"
+    )
+      return;
+    setEditRetry(null);
+    busy.current = true;
+    setWorking(true);
+    setError("");
+    const generation = live.current.generation;
+    const current = () =>
+      live.current.active &&
+      live.current.identity === identity &&
+      live.current.generation === generation;
+    let sent = false;
+    const samePending = () => {
+      const stored = pendingEdit(editKey);
+      return (
+        !!stored &&
+        stored.albumId === wanted.albumId &&
+        stored.title === wanted.title &&
+        stored.coverUrl === wanted.coverUrl
+      );
+    };
+    try {
+      const [detailNow] = await Promise.all([
+        api.detail(token, matchId),
+        api.slots(token, account),
+      ]);
+      if (
+        !current() ||
+        detailNow.albumId !== wanted.albumId ||
+        (detailNow.status !== "COMPLETED" && detailNow.status !== "EXPIRED")
+      )
+        throw new Error("Album changed");
+      let saved = await api.album(token, matchId, wanted.albumId);
+      if (!current()) return;
+      if (!samePending()) throw new Error("Album edit changed");
+      if (!editMatches(editKey, saved)) {
+        if (!beginEditRetry(editKey, wanted))
+          throw new Error("Album edit pending");
+        sent = true;
+        try {
+          await api.edit(token, matchId, wanted.title, wanted.coverUrl);
+        } catch {
+          /* Confirm the saved album before deciding. */
+        }
+        completionSettled(editKey);
+        if (!current()) return;
+        const after = await api.detail(token, matchId);
+        if (
+          !current() ||
+          after.albumId !== wanted.albumId ||
+          (after.status !== "COMPLETED" && after.status !== "EXPIRED")
+        )
+          throw new Error("Album changed");
+        saved = await api.album(token, matchId, wanted.albumId);
+        if (!current() || !samePending() || !editMatches(editKey, saved))
+          throw new Error("Album edit not confirmed");
+        setDetail(after);
+      } else {
+        setDetail(detailNow);
+      }
+      completionConfirmed(editKey);
+      needsCheck.current = completionPhase(key) !== null;
+      setAlbum(saved);
+      if (!draft.current.dirty) {
+        setTitle(saved.title);
+        setCover(saved.coverUrl);
+      }
+    } catch {
+      if (current())
+        setError("アルバムを確認できませんでした。もう一度お試しください。");
+    } finally {
+      if (sent) completionSettled(editKey);
       if (current()) {
         busy.current = false;
         setWorking(false);
@@ -555,6 +670,14 @@ export function SessionCompletionScreen({
         </Card>
       )}
 
+      {editRetry && !working && (
+        <Button
+          language="ja"
+          secondary
+          label="保存内容を確認して再保存"
+          onPress={() => setEditSheet(true)}
+        />
+      )}
       {detail?.status === "ON_COURSE" && (!error || retryReady) && (
         <Card surface="muted" style={styles.onCourseCard}>
           <View style={styles.heroCircle}>
@@ -762,6 +885,61 @@ export function SessionCompletionScreen({
               disabled={working}
             />
           </View>
+        </View>
+      </BottomSheet>
+      <BottomSheet
+        visible={editSheet}
+        onClose={() => {
+          pendingEditConfirm.current = false;
+          setEditSheet(false);
+        }}
+        onDismissed={() => {
+          if (pendingEditConfirm.current) {
+            pendingEditConfirm.current = false;
+            void retryAlbumEdit();
+          }
+        }}
+      >
+        <View style={styles.sheetBody}>
+          <Label variant="sheetTitle" language="ja">
+            この内容をもう一度保存しますか？
+          </Label>
+          <Label language="ja">タイトル: {editRetry?.title}</Label>
+          {editRetry?.coverUrl ? (
+            <Image
+              source={{ uri: editRetry.coverUrl }}
+              style={[styles.timelinePhoto, { width: 82, height: 82 }]}
+              resizeMode="cover"
+            />
+          ) : (
+            <Label language="ja">表紙の変更なし</Label>
+          )}
+          <Button
+            language="ja"
+            label="この内容を保存"
+            disabled={working}
+            onPress={() => {
+              if (
+                pendingEditConfirm.current ||
+                busy.current ||
+                !live.current.active ||
+                live.current.identity !== identity ||
+                live.current.generation !== renderedGeneration
+              )
+                return;
+              pendingEditConfirm.current = true;
+              setEditSheet(false);
+            }}
+          />
+          <Button
+            language="ja"
+            secondary
+            label="戻る"
+            onPress={() => {
+              pendingEditConfirm.current = false;
+              setEditSheet(false);
+            }}
+          />
         </View>
       </BottomSheet>
     </Screen>

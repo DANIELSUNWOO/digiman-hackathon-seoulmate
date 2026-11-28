@@ -34,6 +34,7 @@ export function ChatRoomContainer({
   safetyVisibleRef.current = safetyVisible;
   const [safetyClosing, setSafetyClosing] = useState(false);
   const [safetyScope, setSafetyScope] = useState("");
+  const safetyPartner = useRef("");
   const [openSheetMounted, setOpenSheetMounted] = useState(false);
   const [blockRevision, setBlockRevision] = useState(0);
   const blockQuery = useRef<{
@@ -53,7 +54,8 @@ export function ChatRoomContainer({
   const [blockState, setBlockState] = useState<{
     key: string;
     value: boolean | null;
-  }>({ key: "", value: null });
+    status: "loading" | "ready" | "error" | "uncertain";
+  }>({ key: "", value: null, status: "loading" });
   const scope = JSON.stringify([
     identity.accountId,
     identity.role,
@@ -122,7 +124,19 @@ export function ChatRoomContainer({
         router.canGoBack() ? router.back() : router.replace("/(tabs)"),
       ),
   });
-  const partnerId = room.match?.partner.userId ?? "";
+  const partnerCache = useRef({ scope, id: "" });
+  if (partnerCache.current.scope !== scope)
+    partnerCache.current = { scope, id: "" };
+  if (room.match?.matchId === matchId && room.match.partner.userId)
+    partnerCache.current.id = room.match.partner.userId;
+  const partnerId = partnerCache.current.id;
+  useEffect(() => {
+    if (safetyVisibleRef.current && safetyPartner.current !== partnerId) {
+      safetyController.invalidate();
+      setSafetyClosing(true);
+      setSafetyVisible(false);
+    }
+  }, [partnerId, safetyController]);
   const blockKey = JSON.stringify([scope, partnerId]);
   if (blockQuery.current.key !== blockKey) {
     invalidateBlockQuery();
@@ -143,7 +157,7 @@ export function ChatRoomContainer({
     blockQuery.current.abort = abort;
     const generation = blockQuery.current.generation;
     let current = true;
-    setBlockState({ key: blockKey, value: null });
+    setBlockState({ key: blockKey, value: null, status: "loading" });
     safetyApi.blocked(identity.token, partnerId, abort.signal).then(
       (value) => {
         if (
@@ -165,6 +179,7 @@ export function ChatRoomContainer({
           setBlockState({
             key: blockKey,
             value: confirmed || value ? true : unresolved ? null : false,
+            status: confirmed || value || !unresolved ? "ready" : "uncertain",
           });
         }
       },
@@ -175,7 +190,7 @@ export function ChatRoomContainer({
           blockQuery.current.generation === generation &&
           blockQuery.current.key === blockKey
         )
-          setBlockState({ key: blockKey, value: null });
+          setBlockState({ key: blockKey, value: null, status: "error" });
       },
     );
     return () => {
@@ -185,6 +200,8 @@ export function ChatRoomContainer({
     };
   }, [blockKey, safetyActive, blockRevision]);
   const blocked = blockState.key === blockKey ? blockState.value : null;
+  const blockStatus =
+    blockState.key === blockKey ? blockState.status : "loading";
   const canInteract =
     blocked === false &&
     !safetyController.isBlockConfirmed(identity.accountId, matchId) &&
@@ -198,7 +215,7 @@ export function ChatRoomContainer({
     if (
       !safetyActive ||
       !partnerId ||
-      sheet.visible ||
+      showOpenSheet ||
       openSheetMounted ||
       pending ||
       safetyVisible ||
@@ -207,6 +224,7 @@ export function ChatRoomContainer({
       return;
     setTarget(next);
     setSafetyScope(scope);
+    safetyPartner.current = partnerId;
     setSafetyVisible(true);
   };
   return (
@@ -229,9 +247,17 @@ export function ChatRoomContainer({
         }}
         notice={
           blocked === null
-            ? identity.language === "ko"
-              ? "차단 상태를 확인하지 못했습니다. 새로고침해 주세요."
-              : "ブロック状態を確認できません。更新してください。"
+            ? blockStatus === "loading"
+              ? identity.language === "ko"
+                ? "차단 상태를 확인하고 있습니다."
+                : "ブロック状態を確認しています。"
+              : blockStatus === "uncertain"
+                ? identity.language === "ko"
+                  ? "차단 결과가 아직 확인되지 않았습니다. 안전 메뉴에서 다시 확인해 주세요."
+                  : "ブロック結果を確認できていません。安全メニューから再確認してください。"
+                : identity.language === "ko"
+                  ? "차단 상태를 확인하지 못했습니다. 새로고침해 주세요."
+                  : "ブロック状態を確認できません。更新してください。"
             : room.notice
         }
         onRefresh={() => {
@@ -315,7 +341,11 @@ export function ChatRoomContainer({
         </View>
       </BottomSheet>
       <SafetySheet
-        visible={safetyVisible && safetyScope === scope}
+        visible={
+          safetyVisible &&
+          safetyScope === scope &&
+          safetyPartner.current === partnerId
+        }
         active={safetyActive}
         accountId={identity.accountId}
         token={identity.token}
@@ -331,12 +361,21 @@ export function ChatRoomContainer({
         onDismissed={() => setSafetyClosing(false)}
         onBlocked={() => {
           invalidateBlockQuery();
-          setBlockState({ key: blockKey, value: true });
+          setBlockState({ key: blockKey, value: true, status: "ready" });
           room.onRefresh();
         }}
         onBlockUncertain={() => {
           invalidateBlockQuery();
-          setBlockState({ key: blockKey, value: null });
+          setBlockState({ key: blockKey, value: null, status: "uncertain" });
+        }}
+        onBlockFailed={() => {
+          if (
+            !safetyController.isBlockUnresolved(identity.accountId, matchId)
+          ) {
+            invalidateBlockQuery();
+            setBlockState({ key: blockKey, value: null, status: "loading" });
+            setBlockRevision((value) => value + 1);
+          }
         }}
       />
     </>

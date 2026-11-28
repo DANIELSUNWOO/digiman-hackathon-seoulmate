@@ -70,6 +70,7 @@ export class ChatRoomController {
   private forwardCursor: number | undefined;
   private auditCursor: number | undefined;
   private refreshAgain = false;
+  private writeError: unknown | null = null;
   constructor(
     private api: ChatApi,
     private notify: (state: RoomState) => void,
@@ -93,6 +94,10 @@ export class ChatRoomController {
       this.matchId !== matchId ||
       this.role !== role;
     const tokenChanged = this.token !== (token ?? "");
+    if (identityChanged || tokenChanged) {
+      this.writeError = null;
+      this.state.error = null;
+    }
     const nextActive = !!account && !!token && focused && foreground;
     if (identityChanged || tokenChanged || this.active !== nextActive)
       this.stop();
@@ -172,7 +177,7 @@ export class ChatRoomController {
     if (this.active && this.generation === g && !this.timer)
       this.timer = setTimeout(() => {
         this.timer = null;
-        void this.refresh();
+        void this.refresh(true);
       }, delay);
   }
   private validatePage(rows: ChatMessageView[], cursor: number | undefined) {
@@ -192,7 +197,7 @@ export class ChatRoomController {
       previous = row.messageId;
     }
   }
-  async refresh() {
+  async refresh(silent = false) {
     if (!this.active || this.disposed) return;
     if (this.inFlight) {
       this.refreshAgain = true;
@@ -204,7 +209,7 @@ export class ChatRoomController {
       abort = new AbortController();
     this.abort = abort;
     this.inFlight = true;
-    this.state.loading = true;
+    this.state.loading = !silent || !this.state.detail;
     this.emit();
     try {
       const detail = await this.api.detail(
@@ -259,7 +264,7 @@ export class ChatRoomController {
         this.auditCursor = undefined;
         this.state.backlog = false;
       }
-      this.state.error = null;
+      this.state.error = this.writeError;
     } catch (e) {
       if (g === this.generation) {
         this.state.error = e;
@@ -328,6 +333,8 @@ export class ChatRoomController {
       account = this.account,
       matchId = this.matchId;
     this.pendingWrite = true;
+    this.writeError = null;
+    this.state.error = null;
     this.state.sending = true;
     this.state.sendUncertain = false;
     this.emit();
@@ -353,6 +360,7 @@ export class ChatRoomController {
     } catch (e) {
       if (g === this.generation) {
         this.state.error = e;
+        this.writeError = e;
         this.state.sendUncertain = uncertain(e);
         setChatSendUncertain(account, matchId, this.state.sendUncertain);
       }
@@ -379,6 +387,8 @@ export class ChatRoomController {
       account = this.account,
       matchId = this.matchId;
     this.pendingWrite = true;
+    this.writeError = null;
+    this.state.error = null;
     this.state.opening = true;
     this.state.openUncertain = false;
     this.emit();
@@ -387,6 +397,7 @@ export class ChatRoomController {
     } catch (e) {
       if (g === this.generation) {
         this.state.error = e;
+        this.writeError = e;
         this.state.openUncertain = uncertain(e);
       }
     } finally {

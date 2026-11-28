@@ -53,6 +53,7 @@ export type SafetySheetProps = {
   onDismissed: () => void;
   onBlocked: () => void;
   onBlockUncertain: () => void;
+  onBlockFailed?: () => void;
 };
 
 export function SafetySheet(props: SafetySheetProps) {
@@ -65,6 +66,7 @@ export function SafetySheet(props: SafetySheetProps) {
   const [result, setResult] = useState<SafetyResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [retryUncertain, setRetryUncertain] = useState(false);
+  const [retryBlock, setRetryBlock] = useState(false);
   const busyRef = useRef(false);
   const closeRequested = useRef(false);
   const live = useRef(props);
@@ -93,6 +95,7 @@ export function SafetySheet(props: SafetySheetProps) {
       setDetail("");
       setResult(null);
       setRetryUncertain(false);
+      setRetryBlock(false);
     }
   }, [props.visible, scope, props.target.type, props.target.id]);
 
@@ -117,6 +120,7 @@ export function SafetySheet(props: SafetySheetProps) {
     props.onClose();
   };
   const choose = (next: "report" | "block") => {
+    setRetryBlock(false);
     setMode(next);
     setReason("");
     setDetail("");
@@ -165,6 +169,7 @@ export function SafetySheet(props: SafetySheetProps) {
             props.partnerId,
             reason,
             detail,
+            retryBlock,
           );
     setBusy(false);
     busyRef.current = false;
@@ -178,6 +183,7 @@ export function SafetySheet(props: SafetySheetProps) {
     setResult(response);
     setStep("result");
     if (mode === "block" && response === "success") props.onBlocked();
+    if (mode === "block" && response === "failure") props.onBlockFailed?.();
   };
 
   const reportUncertain = props.controller.isReportUncertain(
@@ -187,6 +193,19 @@ export function SafetySheet(props: SafetySheetProps) {
   const selectedReasonIdx = reasons.indexOf(reason as (typeof reasons)[number]);
   const selectedReasonLabel =
     selectedReasonIdx >= 0 ? names[props.language][selectedReasonIdx] : "";
+  const priorBlock = props.controller.getUncertainBlockPayload(
+    props.accountId,
+    props.matchId,
+    props.partnerId,
+  );
+  const prepareBlockRetry = () => {
+    if (!priorBlock) return;
+    setMode("block");
+    setReason(priorBlock.reason);
+    setDetail(priorBlock.detail);
+    setRetryBlock(true);
+    setStep("confirm");
+  };
 
   return (
     <BottomSheet
@@ -201,6 +220,14 @@ export function SafetySheet(props: SafetySheetProps) {
               {ko ? "안전 메뉴" : "安全メニュー"}
             </Label>
             <View style={styles.menuList}>
+              {priorBlock ? (
+                <Button
+                  secondary
+                  language={props.language}
+                  label={ko ? "이전 차단 재확인" : "前回のブロックを再確認"}
+                  onPress={prepareBlockRetry}
+                />
+              ) : null}
               <Pressable
                 accessibilityRole="button"
                 onPress={() => choose("report")}
@@ -384,9 +411,13 @@ export function SafetySheet(props: SafetySheetProps) {
                     : ko
                       ? "선택한 내용으로 신고하시겠습니까?"
                       : "選択した内容で通報しますか？"
-                  : ko
-                    ? "상대를 차단하시겠습니까? 진행 중인 매칭은 종료됩니다."
-                    : "相手をブロックしますか？進行中のマッチングは終了します。"}
+                  : retryBlock
+                    ? ko
+                      ? "차단 여부를 다시 확인한 뒤 이전 사유로 재시도합니다."
+                      : "ブロック状態を確認後、前回と同じ理由で再試行します。"
+                    : ko
+                      ? "상대를 차단하시겠습니까? 진행 중인 매칭은 종료됩니다."
+                      : "相手をブロックしますか？進行中のマッチングは終了します。"}
               </Text>
               {selectedReasonLabel ? (
                 <View style={styles.reasonSummaryPill}>
@@ -412,8 +443,12 @@ export function SafetySheet(props: SafetySheetProps) {
                     ? "신고 확인"
                     : "通報を確定"
                   : ko
-                    ? "차단 확인"
-                    : "ブロックを確定"
+                    ? retryBlock
+                      ? "확인 후 다시 차단"
+                      : "차단 확인"
+                    : retryBlock
+                      ? "確認して再試行"
+                      : "ブロックを確定"
               }
               onPress={() => void submit()}
             />
@@ -462,6 +497,14 @@ export function SafetySheet(props: SafetySheetProps) {
                       ? "처리하지 못했습니다. 다시 확인해 주세요."
                       : "処理できませんでした。もう一度確認してください。"}
             </Text>
+            {mode === "block" && result === "uncertain" && priorBlock ? (
+              <Button
+                secondary
+                language={props.language}
+                label={ko ? "이전 차단 재확인" : "前回のブロックを再確認"}
+                onPress={prepareBlockRetry}
+              />
+            ) : null}
           </View>
         ) : null}
 

@@ -644,11 +644,35 @@ export default function TagsScreen() {
           </View>
         )}
 
+        <View style={styles.headingBlock}>
+          <Label variant="titleBig" language={language}>
+            {ko ? "어떤 서울을 소개할 수 있나요?" : "どんな旅が好きですか？"}
+          </Label>
+          <Label variant="desc" tone="desc" language={language}>
+            {ko
+              ? "취향이 비슷한 여행자에게 추천돼요."
+              : "好みが近いメイトをおすすめします。"}
+          </Label>
+        </View>
+
+        {(loading || !!tree) && (
+          <View style={styles.generalIntro}>
+            <Text style={[styles.sectionTitle, { fontFamily: subTitleFont }]}>
+              {ko ? "추천할 수 있는 것" : "旅の好み"}
+            </Text>
+            <Text style={[styles.sectionDesc, { fontFamily: subDescFont }]}>
+              {ko ? "잘 아는 것을 모두 골라 주세요." : "いくつでも選べます。"}
+            </Text>
+          </View>
+        )}
+
         {loading ? (
-          <LoadingSkeleton
-            shape="chips"
-            label={ko ? "취향을 불러오는 중입니다" : "好みを読み込んでいます"}
-          />
+          <View style={styles.firstCategoryGroup}>
+            <LoadingSkeleton
+              shape="chips"
+              label={ko ? "취향을 불러오는 중입니다" : "好みを読み込んでいます"}
+            />
+          </View>
         ) : null}
 
         {!!error && (
@@ -685,28 +709,6 @@ export default function TagsScreen() {
 
         {!loading && tree && (
           <>
-            <View style={styles.headingBlock}>
-              <Label variant="titleBig" language={language}>
-                {ko
-                  ? "어떤 서울을 소개할 수 있나요?"
-                  : "どんな旅が好きですか？"}
-              </Label>
-              <Label variant="desc" tone="desc" language={language}>
-                {ko
-                  ? "취향이 비슷한 여행자에게 추천돼요."
-                  : "好みが近いメイトをおすすめします。"}
-              </Label>
-            </View>
-
-            <View style={styles.generalIntro}>
-              <Text style={[styles.sectionTitle, { fontFamily: subTitleFont }]}>
-                {ko ? "추천할 수 있는 것" : "旅の好み"}
-              </Text>
-              <Text style={[styles.sectionDesc, { fontFamily: subDescFont }]}>
-                {ko ? "잘 아는 것을 모두 골라 주세요." : "いくつでも選べます。"}
-              </Text>
-            </View>
-
             {general.map((root, index) => (
               <View
                 key={root.tagId}

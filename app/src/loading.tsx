@@ -5,6 +5,13 @@ import { useReducedMotion } from "./ui";
 
 export type LoadingShape =
   "cards" | "chips" | "form" | "calendar" | "profile" | "rows" | "preview";
+
+const TAG_CHIP_WIDTHS = [
+  [74, 96, 68, 108, 82],
+  [88, 72, 104, 78],
+  [80, 92, 66, 98, 76],
+];
+
 export function LoadingSkeleton({
   label,
   shape = "cards",
@@ -21,13 +28,13 @@ export function LoadingSkeleton({
       Animated.sequence([
         Animated.timing(opacity, {
           toValue: 0.55,
-          duration: 850,
+          duration: 500,
           useNativeDriver: Platform.OS !== "web",
           isInteraction: false,
         }),
         Animated.timing(opacity, {
           toValue: 1,
-          duration: 850,
+          duration: 500,
           useNativeDriver: Platform.OS !== "web",
           isInteraction: false,
         }),
@@ -39,6 +46,7 @@ export function LoadingSkeleton({
       opacity.setValue(1);
     };
   }, [opacity, reduced]);
+
   const block = (
     width: DimensionValue,
     height: number,
@@ -51,10 +59,11 @@ export function LoadingSkeleton({
         width,
         height,
         borderRadius: radius,
-        backgroundColor: theme.color.checkOff,
+        backgroundColor: theme.color.skeleton,
       }}
     />
   );
+
   return (
     <View
       accessible
@@ -64,7 +73,7 @@ export function LoadingSkeleton({
       <Animated.View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
-        style={{ opacity, gap: 12 }}
+        style={{ opacity, gap: shape === "chips" ? 28 : 12 }}
       >
         {shape === "cards" &&
           [0, 1, 2].map((n) => (
@@ -83,13 +92,22 @@ export function LoadingSkeleton({
             </View>
           ))}
         {shape === "chips" &&
-          [0, 1, 2].map((n) => (
-            <View key={n} style={{ gap: 12 }}>
-              {block("38%", 20, "heading")}
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {block(78, 40, "a", 20)}
-                {block(96, 40, "b", 20)}
-                {block(68, 40, "c", 20)}
+          TAG_CHIP_WIDTHS.map((rowWidths, groupIdx) => (
+            <View key={groupIdx} style={{ gap: 12 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
+                {block(22, 22, "icon", 11)}
+                {block(
+                  groupIdx === 1 ? 116 : groupIdx === 2 ? 84 : 96,
+                  18,
+                  "heading",
+                )}
+              </View>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {rowWidths.map((w, idx) =>
+                  block(w, 38, `chip-${groupIdx}-${idx}`, theme.radius.pill),
+                )}
               </View>
             </View>
           ))}
@@ -150,7 +168,7 @@ export function LoadingSkeleton({
                 flexDirection: "row",
                 gap: 12,
                 padding: theme.space.lg,
-                borderRadius: theme.radius.card,
+                borderRadius: theme.radius.cardSub,
                 backgroundColor: theme.color.surface2,
                 alignItems: "flex-start",
               }}

@@ -4,9 +4,33 @@ import type { NotificationItem, NotificationPage } from "./types";
 /**
  * 알림을 눌렀을 때 이동할 곳 (API 명세 알림 표). 화면이 없는 type은 홈이다.
  */
-export function destinationFor({ type, matchId }: NotificationItem): Href {
-  const aboutVisit = type === "VISIT" || type === "REACTION";
-  if (aboutVisit && matchId !== null) return `/matches/${matchId}/visits`;
+export function destinationFor(
+  { type, matchId }: NotificationItem,
+  role?: "TRAVELER" | "MATE",
+): Href {
+  if (
+    typeof matchId !== "number" ||
+    !Number.isSafeInteger(matchId) ||
+    matchId <= 0
+  )
+    return "/(tabs)";
+  if (type === "CHAT_READY" || type === "CHAT_OPEN")
+    return {
+      pathname: "/chats/[matchId]",
+      params: { matchId: String(matchId) },
+    };
+  if (type === "VISIT" || type === "REACTION")
+    return `/matches/${matchId}/visits`;
+  if (type === "COMPLETED" || (type === "EXPIRED" && role === "MATE"))
+    return {
+      pathname: "/matches/[matchId]/album",
+      params: { matchId: String(matchId) },
+    };
+  if (type === "EXPIRED" && role === "TRAVELER")
+    return {
+      pathname: "/matches/[matchId]/complete",
+      params: { matchId: String(matchId) },
+    };
   return "/(tabs)";
 }
 

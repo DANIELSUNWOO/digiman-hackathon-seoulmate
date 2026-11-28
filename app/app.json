@@ -19,12 +19,30 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "프로필 사진 선택을 위해 사진 보관함 접근 권한이 필요합니다.",
-          "cameraPermission": "본인 인증 시연과 프로필 사진 촬영을 위해 카메라 권한이 필요합니다.",
+          "photosPermission": "프로필, 방문 및 스팟 사진 선택을 위해 사진 보관함 접근 권한이 필요합니다.",
+          "cameraPermission": "본인 인증 시연과 프로필, 방문 및 스팟 사진 촬영을 위해 카메라 권한이 필요합니다.",
           "microphonePermission": false
         }
       ]
     ],
-    "web": { "bundler": "metro" }
+    "web": {
+      "bundler": "metro"
+    },
+    "android": {
+      "package": "com.seoulmate.app"
+    },
+    "ios": {
+      "bundleIdentifier": "io.github.nokboongi.seoulmate",
+      "icon": "./assets/ios-app-icon.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f2236cdd-00b2-4051-aa6d-118f11737aa6"
+      }
+    },
+    "owner": "nokboongi"
   }
 }

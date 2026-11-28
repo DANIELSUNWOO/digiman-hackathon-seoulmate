@@ -1,5 +1,6 @@
 import { syncPreferenceDraftAccount } from "./features/preferences/draft";
 import { syncTagDraftAccount } from "./features/tags/draft";
+import { syncChatDraftAccount } from "./features/chat/draft";
 import React, {
   createContext,
   useContext,
@@ -57,6 +58,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     syncTripDraftAccount(state.session?.user.id ?? null);
     syncPreferenceDraftAccount(state.session?.user.id ?? null);
     syncTagDraftAccount(state.session?.user.id ?? null);
+    syncChatDraftAccount(state.session?.user.id ?? null);
   }, [state.session?.user.id]);
   useEffect(() => {
     if (!supabase || !flow) return;

@@ -36,14 +36,17 @@ import {
   View,
   ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaInsetsContext,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 import { theme as t } from "./theme";
 import { useRole } from "./state";
 
 export type FontWeightName = "regular" | "medium" | "semibold" | "bold";
 
 const PRESS_SCALE = 0.98;
-const INTERACTION_DURATION_MS = 120;
+const INTERACTION_DURATION_MS = t.duration.base;
 
 type ViewHandle = ComponentRef<typeof View>;
 type ScrollViewHandle = ComponentRef<typeof ScrollView>;
@@ -126,9 +129,11 @@ export function useFontFamily(weight: FontWeightName, language?: "ko" | "ja") {
 export function Screen({
   children,
   contentStyle,
+  backgroundColor,
 }: {
   children: React.ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
+  backgroundColor?: string;
 }) {
   const viewportRef = useRef<ViewHandle | null>(null);
   const scrollRef = useRef<ScrollViewHandle | null>(null);
@@ -136,6 +141,7 @@ export function Screen({
   const viewportHeightRef = useRef(0);
   const focusedTargetRef = useRef<ViewHandle | null>(null);
   const keyboardTopRef = useRef(0);
+  const keyboardGenerationRef = useRef(0);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const [keyboardInset, setKeyboardInset] = useState(0);
@@ -143,6 +149,7 @@ export function Screen({
   function scrollInputIntoView(target: ViewHandle | null) {
     const viewport = viewportRef.current;
     const scroller = scrollRef.current;
+    const generation = keyboardGenerationRef.current;
     if (!target || !viewport || !scroller) return;
     if (
       typeof viewport.measureInWindow !== "function" ||
@@ -151,9 +158,19 @@ export function Screen({
       return;
     }
     viewport.measureInWindow((_sx, svY, _sw, svH) => {
-      if (!mountedRef.current || focusedTargetRef.current !== target) return;
+      if (
+        !mountedRef.current ||
+        keyboardGenerationRef.current !== generation ||
+        focusedTargetRef.current !== target
+      )
+        return;
       target.measureInWindow((_tx, ty, _tw, th) => {
-        if (!mountedRef.current || focusedTargetRef.current !== target) return;
+        if (
+          !mountedRef.current ||
+          keyboardGenerationRef.current !== generation ||
+          focusedTargetRef.current !== target
+        )
+          return;
         const kbTop = keyboardTopRef.current;
         const bottomEdge = kbTop > 0 ? Math.min(svY + svH, kbTop) : svY + svH;
         const visibleBottom = bottomEdge - 24;
@@ -195,6 +212,7 @@ export function Screen({
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSub = Keyboard?.addListener?.(showEvent, (e) => {
+      const generation = ++keyboardGenerationRef.current;
       const winH = Dimensions?.get?.("window")?.height ?? 0;
       const screenY = e?.endCoordinates?.screenY ?? 0;
       const kbHeight = e?.endCoordinates?.height ?? 0;
@@ -205,7 +223,11 @@ export function Screen({
         const viewport = viewportRef.current;
         if (viewport && typeof viewport.measureInWindow === "function") {
           viewport.measureInWindow((_sx, svY, _sw, svH) => {
-            if (!mountedRef.current) return;
+            if (
+              !mountedRef.current ||
+              keyboardGenerationRef.current !== generation
+            )
+              return;
             const overlap =
               kbTop > 0
                 ? Math.max(0, Math.round(svY + svH - kbTop))
@@ -221,12 +243,18 @@ export function Screen({
     });
 
     const hideSub = Keyboard?.addListener?.(hideEvent, () => {
+      keyboardGenerationRef.current++;
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+        scrollTimerRef.current = null;
+      }
       keyboardTopRef.current = 0;
       setKeyboardInset(0);
     });
 
     return () => {
       mountedRef.current = false;
+      keyboardGenerationRef.current++;
       if (scrollTimerRef.current) {
         clearTimeout(scrollTimerRef.current);
         scrollTimerRef.current = null;
@@ -293,7 +321,10 @@ export function Screen({
   );
 
   return (
-    <SafeAreaView style={s.screen} edges={["top", "bottom", "left", "right"]}>
+    <SafeAreaView
+      style={[s.screen, backgroundColor ? { backgroundColor } : null]}
+      edges={["top", "bottom", "left", "right"]}
+    >
       {Platform.OS === "ios" ? (
         <KeyboardAvoidingView behavior="padding" style={s.flex}>
           {scrollBody}
@@ -356,7 +387,7 @@ export function Label({
           : tone === "assist"
             ? t.color.labelAssist
             : tone === "danger"
-              ? t.color.dangerPress
+              ? t.color.dangerInk
               : tone === "brand"
                 ? t.color.brandDeep
                 : t.color.labelNormal;
@@ -415,6 +446,8 @@ export function Button({
   loading = false,
   secondary = false,
   danger = false,
+  size = "primary",
+  tone = "default",
   language,
   icon,
 }: {
@@ -424,20 +457,40 @@ export function Button({
   loading?: boolean;
   secondary?: boolean;
   danger?: boolean;
+  size?: "primary" | "pair" | "small";
+  tone?: "default" | "weak";
   language?: "ko" | "ja";
   icon?: React.ReactNode;
 }) {
-  const fontFamily = useFontFamily("bold", language);
+  const fontFamily = useFontFamily("semibold", language);
   const reducedMotion = useReducedMotion();
   const scale = useRef(new Animated.Value(1)).current;
   const isDisabled = disabled || loading;
-  const spinnerColor = secondary ? t.color.labelNeutral : t.color.surface;
+  const isWeakSecondary = secondary && tone === "weak";
+  const spinnerColor = isWeakSecondary
+    ? t.color.brandInk2
+    : secondary
+      ? t.color.labelAlt
+      : t.color.surface;
+
+  const sizeStyle =
+    size === "pair"
+      ? s.buttonPair
+      : size === "small"
+        ? s.buttonSmall
+        : undefined;
+  const textSizeStyle =
+    size === "pair"
+      ? s.buttonTextPair
+      : size === "small"
+        ? s.buttonTextSmall
+        : undefined;
 
   function animateScale(toValue: number) {
     Animated.timing(scale, {
       toValue,
       duration: reducedMotion ? 0 : INTERACTION_DURATION_MS,
-      easing: Easing.out(Easing.quad),
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
       useNativeDriver: Platform.OS !== "web",
     }).start();
   }
@@ -455,21 +508,26 @@ export function Button({
         onPressOut={() => animateScale(1)}
         style={({ pressed }) => [
           s.button,
-          secondary && s.secondary,
+          sizeStyle,
+          secondary && (isWeakSecondary ? s.secondaryWeak : s.secondary),
           danger && !secondary && s.dangerButton,
           !isDisabled &&
             pressed &&
-            (secondary
-              ? s.secondaryPressed
-              : danger
-                ? s.dangerPressed
-                : s.primaryPressed),
+            (isWeakSecondary
+              ? s.secondaryWeakPressed
+              : secondary
+                ? s.secondaryPressed
+                : danger
+                  ? s.dangerPressed
+                  : s.primaryPressed),
           isDisabled &&
-            (secondary
-              ? s.secondaryDisabled
-              : danger
-                ? s.dangerDisabled
-                : s.disabled),
+            (isWeakSecondary
+              ? s.secondaryWeakDisabled
+              : secondary
+                ? s.secondaryDisabled
+                : danger
+                  ? s.dangerDisabled
+                  : s.disabled),
         ]}
       >
         {loading ? (
@@ -480,8 +538,12 @@ export function Button({
         <Text
           style={[
             s.buttonText,
+            textSizeStyle,
             { fontFamily },
-            secondary && { color: t.color.labelNeutral },
+            secondary &&
+              (isWeakSecondary
+                ? { color: t.color.brandInk2 }
+                : { color: t.color.labelAlt }),
             isDisabled && secondary && { color: t.color.labelDisable },
           ]}
         >
@@ -496,11 +558,13 @@ export function Card({
   children,
   selected,
   onPress,
+  surface = "white",
   style,
 }: {
   children: React.ReactNode;
   selected?: boolean;
   onPress?: () => void;
+  surface?: "white" | "muted";
   style?: StyleProp<ViewStyle>;
 }) {
   const reducedMotion = useReducedMotion();
@@ -515,9 +579,13 @@ export function Card({
     }).start();
   }
 
+  const cardSurfaceStyle = surface === "muted" ? s.cardMuted : undefined;
+
   if (!onPress) {
     return (
-      <View style={[s.card, selected && s.selected, style]}>{children}</View>
+      <View style={[s.card, cardSurfaceStyle, selected && s.selected, style]}>
+        {children}
+      </View>
     );
   }
   return (
@@ -528,7 +596,7 @@ export function Card({
         onPress={onPress}
         onPressIn={() => animateScale(PRESS_SCALE)}
         onPressOut={() => animateScale(1)}
-        style={[s.card, selected && s.selected, style]}
+        style={[s.card, cardSurfaceStyle, selected && s.selected, style]}
       >
         {children}
       </Pressable>
@@ -549,7 +617,7 @@ export function Input({
   error?: boolean;
   inputRef?: React.Ref<React.ComponentRef<typeof TextInput>>;
 }) {
-  const fontFamily = useFontFamily("regular", language);
+  const fontFamily = useFontFamily("medium", language);
   const reducedMotion = useReducedMotion();
   const [focused, setFocused] = useState(false);
   const focusAnim = useRef(new Animated.Value(0)).current;
@@ -565,7 +633,7 @@ export function Input({
   useEffect(() => {
     Animated.timing(focusAnim, {
       toValue: focused && !disabled ? 1 : 0,
-      duration: reducedMotion ? 0 : INTERACTION_DURATION_MS,
+      duration: reducedMotion ? 0 : t.duration.fast,
       easing: Easing.out(Easing.quad),
       useNativeDriver: false,
     }).start();
@@ -573,7 +641,11 @@ export function Input({
 
   const animatedBorderColor = focusAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [t.color.lineNormal, t.color.brand],
+    outputRange: [t.color.inputBorder, t.color.brand],
+  });
+  const animatedBgColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [t.color.fillG, t.color.surface],
   });
 
   return (
@@ -582,8 +654,8 @@ export function Input({
         style={[
           s.inputWrap,
           isMultiline && s.inputWrapMultiline,
-          disabled && s.inputDisabled,
           {
+            backgroundColor: disabled ? t.color.surface2 : animatedBgColor,
             borderColor: error
               ? t.color.danger
               : disabled
@@ -594,7 +666,7 @@ export function Input({
       >
         <TextInput
           ref={inputRef}
-          placeholderTextColor={t.color.labelAlt}
+          placeholderTextColor={t.color.labelDesc}
           underlineColorAndroid="transparent"
           {...props}
           onFocus={(e) => {
@@ -695,7 +767,7 @@ export function Chip({
   );
 }
 
-const SHEET_ENTER_EASING = Easing.bezier(0.2, 0, 0, 1);
+const SHEET_ENTER_EASING = Easing.bezier(0.2, 0.8, 0.2, 1);
 const SHEET_EXIT_EASING = Easing.bezier(0.4, 0, 1, 1);
 const SHEET_DIM_OPEN_MS = t.duration.base;
 const SHEET_PANEL_OPEN_MS = t.duration.sheet;
@@ -715,6 +787,8 @@ export function BottomSheet({
 }) {
   const { role } = useRole();
   const reducedMotion = useReducedMotion();
+  const insets = useContext(SafeAreaInsetsContext);
+  const bottomInset = Math.max(insets?.bottom ?? 0, 0);
   const [mounted, setMounted] = useState(visible);
   const sheetHeightRef = useRef(Dimensions.get("window").height);
   const fullyClosedRef = useRef(true);
@@ -873,10 +947,11 @@ export function BottomSheet({
             }}
             style={[
               s.sheetWrap,
+              { paddingBottom: bottomInset + 10 },
               { transform: [{ translateY: panelProgress }] },
             ]}
           >
-            <SafeAreaView edges={["bottom"]} style={s.sheet}>
+            <View style={s.sheet}>
               <View style={s.sheetHandle} />
               <ScreenScrollContext.Provider value={null}>
                 <ScrollView
@@ -886,7 +961,7 @@ export function BottomSheet({
                   {children}
                 </ScrollView>
               </ScreenScrollContext.Provider>
-            </SafeAreaView>
+            </View>
           </Animated.View>
         </KeyboardAvoidingView>
       </View>
@@ -1117,7 +1192,7 @@ export function ErrorNotice({
   return (
     <View style={s.errorNotice} accessibilityLiveRegion="polite">
       <View style={s.errorNoticeIcon}>
-        <WarningCircle size={16} color={t.color.dangerPress} />
+        <WarningCircle size={16} color={t.color.dangerInk} />
       </View>
       <Text style={[s.errorNoticeText, { fontFamily }]}>{children}</Text>
     </View>
@@ -1187,17 +1262,37 @@ const s = StyleSheet.create({
     paddingHorizontal: t.space.lg,
     paddingVertical: t.space.md,
   },
+  buttonPair: {
+    minHeight: t.size.buttonPair,
+    borderRadius: t.radius.buttonPair,
+    paddingVertical: 10,
+  },
+  buttonSmall: {
+    minHeight: t.size.buttonSmall,
+    borderRadius: t.radius.buttonSmall,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   primaryPressed: {
     backgroundColor: t.color.brandPress,
   },
   secondary: {
-    backgroundColor: t.color.surface2,
+    backgroundColor: t.color.grey100,
   },
   secondaryPressed: {
-    backgroundColor: t.color.fillNormal,
+    backgroundColor: t.color.grey200,
   },
   secondaryDisabled: {
-    backgroundColor: t.color.surface2,
+    backgroundColor: t.color.grey100,
+  },
+  secondaryWeak: {
+    backgroundColor: t.color.brandWeak,
+  },
+  secondaryWeakPressed: {
+    backgroundColor: t.color.brandSoft,
+  },
+  secondaryWeakDisabled: {
+    backgroundColor: t.color.grey100,
   },
   dangerButton: {
     backgroundColor: t.color.danger,
@@ -1210,12 +1305,23 @@ const s = StyleSheet.create({
   },
   disabled: { backgroundColor: t.color.brandDis },
   buttonText: {
-    fontSize: t.typography.body1.fontSize,
-    lineHeight: t.typography.body1.lineHeight,
+    fontSize: t.typography.button.fontSize,
+    lineHeight: t.typography.button.lineHeight,
+    letterSpacing: t.typography.button.letterSpacing,
     color: t.color.surface,
     textAlign: "center",
     flexShrink: 1,
     includeFontPadding: false,
+  },
+  buttonTextPair: {
+    fontSize: 16,
+    lineHeight: 22,
+    letterSpacing: 0,
+  },
+  buttonTextSmall: {
+    fontSize: t.typography.label.fontSize,
+    lineHeight: t.typography.label.lineHeight,
+    letterSpacing: 0,
   },
   card: {
     borderRadius: t.radius.card,
@@ -1225,6 +1331,10 @@ const s = StyleSheet.create({
     backgroundColor: t.color.surface,
     ...t.shadow.card,
   },
+  cardMuted: {
+    borderRadius: t.radius.cardSub,
+    backgroundColor: t.color.fillG,
+  },
   selected: {
     borderWidth: 1.5,
     borderColor: t.color.brand,
@@ -1233,9 +1343,9 @@ const s = StyleSheet.create({
   inputWrap: {
     minHeight: t.size.input,
     minWidth: t.size.touchMin,
-    backgroundColor: t.color.surface,
+    backgroundColor: t.color.fillG,
     borderWidth: 1.5,
-    borderColor: t.color.lineNormal,
+    borderColor: t.color.inputBorder,
     borderRadius: t.radius.input,
     justifyContent: "center",
   },
@@ -1247,9 +1357,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: Platform.OS === "web" ? 10 : 4,
     color: t.color.labelNormal,
-    fontSize: t.typography.body1.fontSize,
+    fontSize: t.typography.list.fontSize,
     ...(Platform.OS === "web"
-      ? { lineHeight: t.typography.body1.lineHeight }
+      ? { lineHeight: t.typography.button.lineHeight }
       : {}),
     textAlignVertical: "center",
     includeFontPadding: false,
@@ -1259,8 +1369,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: t.color.labelNormal,
-    fontSize: t.typography.body1.fontSize,
-    lineHeight: t.typography.body1.lineHeight,
+    fontSize: t.typography.list.fontSize,
+    lineHeight: t.typography.button.lineHeight,
     textAlignVertical: "top",
     includeFontPadding: false,
   },
@@ -1280,7 +1390,7 @@ const s = StyleSheet.create({
     backgroundColor: t.color.surface,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    minHeight: t.size.buttonSmall,
+    minHeight: 34,
     minWidth: t.size.touchMin,
     justifyContent: "center",
   },
@@ -1299,7 +1409,7 @@ const s = StyleSheet.create({
   chipText: {
     fontSize: t.typography.chip.fontSize,
     lineHeight: t.typography.chip.lineHeight,
-    color: t.color.labelNeutral,
+    color: t.color.labelAlt,
     textAlign: "center",
   },
   chipSublabel: {
@@ -1319,16 +1429,17 @@ const s = StyleSheet.create({
   },
   sheetWrap: {
     width: "100%",
-    maxHeight: "85%",
+    maxHeight: "88%",
+    paddingHorizontal: 10,
   },
   sheet: {
     maxHeight: "100%",
     backgroundColor: t.color.surface,
-    borderTopLeftRadius: t.radius.sheet,
-    borderTopRightRadius: t.radius.sheet,
-    paddingHorizontal: t.space.xl,
+    borderRadius: t.radius.sheet,
+    overflow: "hidden",
+    paddingHorizontal: t.space.screen,
     paddingTop: t.space.md,
-    paddingBottom: t.space.xl,
+    paddingBottom: t.space.screen,
     ...t.shadow.sheet,
   },
   sheetHandle: {
@@ -1511,7 +1622,7 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: t.typography.caption.fontSize,
     lineHeight: t.typography.caption.lineHeight,
-    color: t.color.dangerPress,
+    color: t.color.dangerInk,
     includeFontPadding: false,
     textAlign: "left",
   },

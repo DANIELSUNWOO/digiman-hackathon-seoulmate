@@ -10,13 +10,19 @@ import type { Progress } from "./types";
 
 // 11/28 디자인: 인증 완료 화면의 막대 두께는 12px이다.
 const BAR_HEIGHT = 12;
+const COURSE_BAR_HEIGHT = 8;
 const MARKER_SIZE = 28;
 
 export interface VisitProgressProps {
   progress: Progress;
+  variant?: "complete" | "course";
 }
 
-export function VisitProgress({ progress }: VisitProgressProps): ReactElement {
+export function VisitProgress({
+  progress,
+  variant = "complete",
+}: VisitProgressProps): ReactElement {
+  const barHeight = variant === "course" ? COURSE_BAR_HEIGHT : BAR_HEIGHT;
   const { visited, total } = progress;
   const { ratio, chatAt, remaining } = progressView(progress);
   const title = strings.progress(visited, total);
@@ -42,7 +48,7 @@ export function VisitProgress({ progress }: VisitProgressProps): ReactElement {
         aria-valuenow={visited}
         style={styles.bar}
       >
-        <View style={styles.track}>
+        <View style={[styles.track, { height: barHeight }]}>
           <View style={[styles.fill, { width: `${ratio * 100}%` }]} />
         </View>
         {chatAt !== null && <ChatMarker at={chatAt} open={remaining === 0} />}
@@ -77,6 +83,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     gap: theme.space.sm,
+    flexWrap: "wrap",
   },
   // 자물쇠가 막대보다 커서 위아래 자리를 마련한다.
   bar: { height: MARKER_SIZE, justifyContent: "center" },
@@ -86,7 +93,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.surface2,
     overflow: "hidden",
   },
-  fill: { height: BAR_HEIGHT, backgroundColor: theme.color.brand },
+  fill: { height: "100%", backgroundColor: theme.color.accent },
   marker: {
     position: "absolute",
     width: MARKER_SIZE,

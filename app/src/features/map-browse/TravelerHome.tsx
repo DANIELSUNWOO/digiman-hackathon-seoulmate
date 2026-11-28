@@ -5,13 +5,18 @@ import { ScrollView, View, Text } from "react-native";
 import { theme } from "../../theme";
 import { createMatchApi, type ActiveMatch } from "../map-browse/matches";
 import { useSession } from "../../session";
+import { nextStep } from "../../users";
 import { Button, Card, Label, Screen } from "../../ui";
+import { NotificationBell } from "../notifications/NotificationBell";
+import { useNavigationLock } from "../chat/useNavigationLock";
 const api = createMatchApi();
 export function TravelerHome() {
-  const { session } = useSession();
+  const { session, load } = useSession();
+  const needsTrip = load.kind === "ready" && nextStep(load.me) === "trip";
   const account = session?.user.id ?? "";
   const token = session?.access_token ?? "";
   const router = useRouter();
+  const navigate = useNavigationLock();
   const [matches, setMatches] = useState<ActiveMatch[] | null>(null);
   const [slots, setSlots] = useState<{ total: number; used: number } | null>(
     null,
@@ -50,7 +55,35 @@ export function TravelerHome() {
   );
   return (
     <Screen>
-      <Label title>ホーム</Label>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: theme.space.sm,
+        }}
+      >
+        <Label title>ホーム</Label>
+        <NotificationBell
+          lang="ja"
+          onPress={() => navigate(() => router.push("/notifications"))}
+        />
+      </View>
+      {needsTrip && (
+        <Card>
+          <Label language="ja" weight="bold">
+            新しい旅行には日程の登録が必要です
+          </Label>
+          <Label language="ja">日程を登録すると、新しい地図を選べます。</Label>
+          <Button
+            label="旅行日程を登録する"
+            language="ja"
+            onPress={() =>
+              navigate(() => router.push("/(onboarding)/trip?from=account"))
+            }
+          />
+        </Card>
+      )}
       {error && (
         <>
           <Label>マッチングを確認できませんでした</Label>
@@ -139,13 +172,17 @@ export function TravelerHome() {
                       onPress={
                         m.mapId === null
                           ? undefined
-                          : () => router.push(`/explore/${m.mapId}`)
+                          : () =>
+                              navigate(() =>
+                                router.push({
+                                  pathname: "/matches/[matchId]",
+                                  params: { matchId: String(m.matchId) },
+                                }),
+                              )
                       }
                     >
                       <Label weight="bold">
-                        {m.partner
-                          ? `${m.partner}さんのコース`
-                          : "選択中のコース"}
+                        {m.partner ? `${m.partner}さんの地図` : "選択中の地図"}
                       </Label>
                       <Label>{m.title || "選択中の地図"}</Label>
                       {m.visited !== null && m.total !== null ? (
@@ -164,9 +201,27 @@ export function TravelerHome() {
                       {m.mapId === null ? (
                         <Label>地図の情報を確認できません</Label>
                       ) : (
-                        <Label tone="brand">公開スポットを見る</Label>
+                        <Label tone="brand">地図を見る</Label>
                       )}
                     </Card>
+                    <Button
+                      secondary
+                      language="ja"
+                      label={
+                        m.chatStatus === "LOCKED"
+                          ? "チャットはまだ使えません"
+                          : "チャットする"
+                      }
+                      disabled={
+                        m.chatStatus !== "READY" && m.chatStatus !== "OPEN"
+                      }
+                      onPress={() =>
+                        router.push({
+                          pathname: "/chats/[matchId]",
+                          params: { matchId: String(m.matchId) },
+                        })
+                      }
+                    />
                   </View>
                 ))}
               </ScrollView>

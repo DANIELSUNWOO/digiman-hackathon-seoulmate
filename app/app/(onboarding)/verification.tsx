@@ -1,5 +1,10 @@
-import { Redirect, useRouter } from "expo-router";
-import { Camera, CaretLeft, UserSquare } from "phosphor-react-native";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Camera,
+  CaretLeft,
+  CheckCircle,
+  UserSquare,
+} from "phosphor-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -19,6 +24,12 @@ import {
   onboardingApiMessage,
   verificationCopy,
 } from "../../src/features/onboarding/messages";
+import {
+  parseOnboardingOrigin,
+  previousOnboardingRoute,
+  useOnboardingBackHandler,
+  useOnboardingDismiss,
+} from "../../src/features/onboarding/navigation";
 import {
   pickImageAsset,
   writeNativeDemoPassportTempFile,
@@ -43,6 +54,9 @@ const PASSPORT_ASPECT_RATIO = 125 / 88;
 
 export default function VerificationScreen() {
   const router = useRouter();
+  const dismiss = useOnboardingDismiss();
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const origin = parseOnboardingOrigin(from);
   const { session, load, busy, flow } = useSession();
   const [selectedSample, setSelectedSample] =
     useState<LocalProfilePhoto | null>(null);
@@ -78,10 +92,34 @@ export default function VerificationScreen() {
     setSubmitting(false);
   }, [userId]);
 
+  function handleCancelSubmit() {
+    attemptRef.current += 1;
+    submitControllerRef.current?.abort();
+    submitControllerRef.current = null;
+    submittingRef.current = false;
+    setSubmitting(false);
+  }
+
+  function handleBack() {
+    if (submitting) handleCancelSubmit();
+    const role = load.kind === "ready" ? load.me.role : "TRAVELER";
+    dismiss(previousOnboardingRoute(role, "verification", origin));
+  }
+
+  useOnboardingBackHandler(() => {
+    handleBack();
+    return true;
+  });
+
   if (!session || load.kind !== "ready") return null;
 
   const step = nextStep(load.me);
-  if (step !== "verification") {
+  if (load.me.role === "MATE") {
+    return <Redirect href={onboardingRouteFor(step)} />;
+  }
+  const isVerifiedRevisit =
+    load.me.onboarding.verified && origin === "onboarding";
+  if (load.me.onboarding.verified && !isVerifiedRevisit) {
     return <Redirect href={onboardingRouteFor(step)} />;
   }
 
@@ -94,19 +132,6 @@ export default function VerificationScreen() {
 
   function isSameContext(expectedUserId: string) {
     return mountedRef.current && latestUserRef.current === expectedUserId;
-  }
-
-  function handleCancelSubmit() {
-    submitControllerRef.current?.abort();
-    submitControllerRef.current = null;
-    submittingRef.current = false;
-    setSubmitting(false);
-  }
-
-  function handleBack() {
-    if (submitting) handleCancelSubmit();
-    if (router.canGoBack()) router.back();
-    else router.replace("/account");
   }
 
   async function handlePick(source: "library" | "camera") {
@@ -158,10 +183,14 @@ export default function VerificationScreen() {
       if (result.kind === "verified") {
         setSelectedSample(null);
         const updatedLoad = flow.snapshot().load;
+        const next =
+          updatedLoad.kind === "ready" ? nextStep(updatedLoad.me) : null;
         const target =
-          updatedLoad.kind === "ready"
-            ? onboardingRouteFor(nextStep(updatedLoad.me))
-            : "/account";
+          next === "profile"
+            ? "/(onboarding)/profile?from=onboarding"
+            : updatedLoad.kind === "ready"
+              ? onboardingRouteFor(next)
+              : "/account";
         router.replace(target);
       } else if (result.kind === "refresh_failed") {
         setRefreshFailed(true);
@@ -200,7 +229,11 @@ export default function VerificationScreen() {
         const next = nextStep(snap.load.me);
         if (next !== "verification") {
           setRefreshFailed(false);
-          router.replace(onboardingRouteFor(next));
+          router.replace(
+            next === "profile"
+              ? "/(onboarding)/profile?from=onboarding"
+              : onboardingRouteFor(next),
+          );
           return;
         }
       }
@@ -216,6 +249,51 @@ export default function VerificationScreen() {
         setSubmitting(false);
       }
     }
+  }
+
+  if (isVerifiedRevisit) {
+    return (
+      <Screen contentStyle={styles.content}>
+        <View style={styles.onboardingTop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.backLabel}
+            disabled={busy}
+            onPress={handleBack}
+            style={styles.backButton}
+          >
+            <CaretLeft size={theme.size.icon} color={theme.color.labelNormal} />
+          </Pressable>
+          <ProgressTracker
+            steps={TRAVELER_STEPS}
+            currentIndex={0}
+            language={language}
+          />
+        </View>
+
+        <View style={styles.verifiedState}>
+          <View style={styles.verifiedBadge}>
+            <CheckCircle size={36} color={theme.color.positive} weight="fill" />
+          </View>
+          <Label title language={language}>
+            {copy.alreadyVerifiedTitle}
+          </Label>
+          <Text style={[styles.desc, { fontFamily: bodyFont }]}>
+            {copy.alreadyVerifiedDesc}
+          </Text>
+        </View>
+
+        <ScreenFooter>
+          <Button
+            language={language}
+            label={copy.nextButton}
+            onPress={() =>
+              router.replace("/(onboarding)/profile?from=onboarding")
+            }
+          />
+        </ScreenFooter>
+      </Screen>
+    );
   }
 
   return (
@@ -373,6 +451,19 @@ const styles = StyleSheet.create({
     height: theme.size.touchMin,
     alignItems: "flex-start",
     justifyContent: "center",
+  },
+  verifiedState: {
+    marginTop: theme.space.xl,
+    gap: theme.space.sm,
+  },
+  verifiedBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: theme.color.positiveSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: theme.space.xs,
   },
   intro: {
     marginTop: theme.space.md,

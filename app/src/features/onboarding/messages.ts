@@ -133,6 +133,11 @@ export function onboardingApiMessage(error: unknown, ko: boolean): string {
       ? "먼저 본인 인증을 완료해 주세요."
       : "先に本人確認を完了してください。";
   }
+  if (code === "PROFILE_REQUIRED") {
+    return ko
+      ? "먼저 프로필을 등록해 주세요."
+      : "先にプロフィールを登録してください。";
+  }
   if (code === "PROFILE_ALREADY_REGISTERED") {
     return ko
       ? "이미 프로필이 등록되어 있습니다. 상태를 다시 확인해 주세요."
@@ -185,12 +190,22 @@ export const verificationCopy = (ko: boolean) => ({
     ? "인증은 전송됐지만 회원 상태를 다시 확인하지 못했습니다."
     : "確認は送信されましたが、会員状態を再取得できませんでした。",
   retryRefresh: ko ? "상태 다시 확인" : "状態を再確認",
+  alreadyVerifiedTitle: ko
+    ? "본인 인증이 완료되었습니다"
+    : "本人確認が完了しています",
+  alreadyVerifiedDesc: ko
+    ? "이미 본인 인증을 마쳤습니다. 다시 제출하지 않고 다음 단계로 이동할 수 있습니다."
+    : "すでに本人確認が完了しています。再提出せずに次のステップへ進めます。",
+  nextButton: ko ? "다음" : "次へ",
 });
 
 export const profileCopy = (ko: boolean, isMate: boolean) => ({
   headerTitle: ko ? "프로필" : "プロフィール",
+  editHeaderTitle: ko ? "프로필 수정" : "プロフィール編集",
   backLabel: ko ? "뒤로" : "戻る",
   changePhotoLabel: ko ? "프로필 사진 변경" : "プロフィール写真を変更",
+  photoSheetTitle: ko ? "프로필 사진" : "プロフィール写真",
+  photoSheetClose: ko ? "닫기" : "閉じる",
   pickPhoto: ko ? "앨범에서 선택" : "アルバムから選ぶ",
   takePhoto: ko ? "카메라로 촬영" : "カメラで撮る",
   removePhoto: ko ? "사진 지우기" : "写真を外す",
@@ -211,20 +226,30 @@ export const profileCopy = (ko: boolean, isMate: boolean) => ({
   genderFemale: ko ? "여성" : "女性",
   genderMale: ko ? "남성" : "男性",
   genderUnspecified: ko ? "응답 안 함" : "回答しない",
+  genderReadonlyHint: ko
+    ? "성별은 최초 등록 후 변경할 수 없습니다."
+    : "性別は登録後に変更できません。",
   birthYearLabel: ko ? "출생연도" : "生まれた年",
   birthYearPlaceholder: ko ? "예: 1998" : "例: 2000",
   birthYearHint: ko
     ? "4자리 연도, 만 18세 이상만 가입할 수 있습니다"
     : "4桁の西暦、18歳以上のみ登録できます",
+  birthYearReadonlyHint: ko
+    ? "출생연도는 최초 등록 후 변경할 수 없습니다."
+    : "生まれた年は登録後に変更できません。",
   bioLabel: ko ? "소개 (선택)" : "自己紹介 (任意)",
   bioPlaceholder: ko
     ? "성수에서 8년째 살고 있어요. 카페 사장님들과 친해요."
     : "初めてのソウル一人旅です。カフェと写真が好き！",
   nextButton: ko ? "다음" : "次へ",
+  saveButton: ko ? "저장" : "保存",
   savingButton: ko ? "저장 중" : "保存中",
   cancelButton: ko ? "취소" : "キャンセル",
   refreshFailed: ko
     ? "프로필이 저장됐지만 다음 단계 확인에 실패했습니다."
     : "プロフィールは保存されましたが、次の段階の確認に失敗しました。",
+  editRefreshFailed: ko
+    ? "프로필 수정 반영을 확인하지 못했습니다. 상태를 다시 확인해 주세요."
+    : "プロフィールの変更反映を確認できませんでした。状態を再確認してください。",
   retryRefresh: ko ? "상태 다시 확인" : "状態を再確認",
 });

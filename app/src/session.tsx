@@ -1,3 +1,4 @@
+import { syncTagDraftAccount } from "./features/tags/draft";
 import React, {
   createContext,
   useContext,
@@ -51,6 +52,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   );
   useEffect(() => {
     syncDraftAccount(state.session?.user.id ?? null);
+    syncTagDraftAccount(state.session?.user.id ?? null);
   }, [state.session?.user.id]);
   useEffect(() => {
     if (!supabase || !flow) return;

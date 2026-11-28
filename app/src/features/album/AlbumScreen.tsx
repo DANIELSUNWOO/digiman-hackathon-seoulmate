@@ -1,12 +1,10 @@
 // T-31 / M-40 앨범 보기
 import type { ReactElement } from "react";
-import { Button } from "../../ui";
 import type { ViewerLang } from "../translation";
 import type { ReportTarget } from "../visits";
-import { AlbumList } from "./AlbumList";
 import { AlbumStatus } from "./AlbumStatus";
+import { AlbumView } from "./AlbumView";
 import { albumApi, type AlbumApi } from "./api";
-import { strings } from "./strings";
 import { useAlbum } from "./useAlbum";
 
 export interface AlbumScreenProps {
@@ -15,6 +13,9 @@ export interface AlbumScreenProps {
   lang: ViewerLang;
   isMate: boolean;
   onBack: () => void;
+  onHome: () => void;
+  /** 요약 카드의 "자세히 보기" */
+  onOpenVisits: () => void;
   /** 신고 화면(클라 P)이 연결되기 전에는 없다. */
   onReport?: (target: ReportTarget) => void;
 }
@@ -22,21 +23,18 @@ export interface AlbumScreenProps {
 export function AlbumScreen({
   api = albumApi,
   matchId,
-  onBack,
-  ...list
+  ...view
 }: AlbumScreenProps): ReactElement {
   const { state, retry } = useAlbum(api, matchId);
-  const { lang } = list;
-  const back = (
-    <Button
-      label={strings[lang].back}
-      language={lang}
-      secondary
-      onPress={onBack}
-    />
-  );
 
   if (state.status === "ready")
-    return <AlbumList album={state.album} top={back} {...list} />;
-  return <AlbumStatus state={state} lang={lang} top={back} onRetry={retry} />;
+    return <AlbumView album={state.album} trip={state.trip} {...view} />;
+  return (
+    <AlbumStatus
+      state={state}
+      lang={view.lang}
+      onBack={view.onBack}
+      onRetry={retry}
+    />
+  );
 }

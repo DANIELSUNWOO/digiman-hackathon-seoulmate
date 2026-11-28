@@ -9,7 +9,6 @@ export interface AlbumStrings {
   spotCount: (count: number) => string;
   coverLabel: string;
   empty: string;
-  review: string;
   errorNotFound: string;
   errorForbidden: string;
   errorNetwork: string;
@@ -28,7 +27,6 @@ export const strings: Record<ViewerLang, AlbumStrings> = {
     spotCount: (count) => `인증한 곳 ${count}곳`,
     coverLabel: "앨범 표지",
     empty: "인증한 곳이 없어요",
-    review: "후기 보기·남기기",
     errorNotFound: "아직 앨범이 없어요. 여행이 끝나면 만들어져요",
     errorForbidden: "이 매칭의 앨범은 볼 수 없어요",
     errorNetwork: "네트워크 연결을 확인해 주세요",
@@ -44,7 +42,6 @@ export const strings: Record<ViewerLang, AlbumStrings> = {
     spotCount: (count) => `認証したスポット ${count}か所`,
     coverLabel: "アルバムの表紙",
     empty: "認証したスポットはありません",
-    review: "レビューを見る・書く",
     errorNotFound: "アルバムはまだありません。旅行が終わると作られます",
     errorForbidden: "このマッチのアルバムは表示できません",
     errorNetwork: "ネットワーク接続を確認してください",

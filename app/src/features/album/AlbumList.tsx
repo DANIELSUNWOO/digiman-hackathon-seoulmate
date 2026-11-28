@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { FlatList, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { theme } from "../../theme";
-import { Button, Label } from "../../ui";
+import { Label } from "../../ui";
 import type { ViewerLang } from "../translation";
 import type { ReportTarget } from "../visits";
 import { AlbumEntry } from "./AlbumEntry";
@@ -16,7 +16,6 @@ export interface AlbumListProps {
   isMate: boolean;
   /** 목록 위에 함께 스크롤되는 요소 */
   top: ReactNode;
-  onReview?: () => void;
   onReport?: (target: ReportTarget) => void;
 }
 
@@ -26,7 +25,6 @@ export function AlbumList({
   lang,
   isMate,
   top,
-  onReview,
   onReport,
 }: AlbumListProps): ReactElement {
   const text = strings[lang];
@@ -60,11 +58,6 @@ export function AlbumList({
           <Label center language={lang}>
             {text.empty}
           </Label>
-        }
-        ListFooterComponent={
-          onReview && (
-            <Button label={text.review} language={lang} onPress={onReview} />
-          )
         }
       />
     </SafeAreaView>

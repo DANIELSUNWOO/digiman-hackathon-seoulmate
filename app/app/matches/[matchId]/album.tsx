@@ -13,8 +13,10 @@ export default function MatchAlbum(): ReactElement | null {
   if (!ready) return null;
   if (!session) return <Redirect href="/auth" />;
   if (busy || load.kind === "loading") return null;
-  if (load.kind !== "ready" || nextStep(load.me))
-    return <Redirect href="/account" />;
+  if (load.kind !== "ready") return <Redirect href="/account" />;
+  // 여행 종료일이 지난 여행자는 "trip" 단계가 다시 남는다. 끝난 여행의 화면은 막지 않는다.
+  const step = nextStep(load.me);
+  if (step && step !== "trip") return <Redirect href="/account" />;
   if (matchId === null) return <Redirect href="/(tabs)" />;
 
   return (
@@ -26,7 +28,6 @@ export default function MatchAlbum(): ReactElement | null {
       onBack={() =>
         router.canGoBack() ? router.back() : router.replace("/(tabs)")
       }
-      onReview={() => router.push(`/matches/${matchId}/review`)}
     />
   );
 }

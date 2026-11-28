@@ -15,8 +15,6 @@ export interface AlbumScreenProps {
   lang: ViewerLang;
   isMate: boolean;
   onBack: () => void;
-  /** 상호 후기 화면으로 간다. 없으면 버튼을 그리지 않는다. */
-  onReview?: () => void;
   /** 신고 화면(클라 P)이 연결되기 전에는 없다. */
   onReport?: (target: ReportTarget) => void;
 }

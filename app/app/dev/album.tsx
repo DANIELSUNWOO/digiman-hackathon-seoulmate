@@ -53,7 +53,6 @@ export default function DevAlbum(): ReactElement {
           lang={isMate ? "ko" : "ja"}
           isMate={isMate}
           onBack={() => {}}
-          onReview={() => setPressed("· 후기 눌림")}
           onReport={({ targetType, targetId }) =>
             setPressed(`· 신고 ${targetType} ${targetId}`)
           }

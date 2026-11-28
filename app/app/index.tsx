@@ -44,7 +44,7 @@ export default function Splash() {
 
   const lang = detectSplashLanguage();
   const isKo = lang === "ko";
-  // Temporary splash slogan pending final team copy confirmation.
+  // The Korean and Japanese splash slogans are confirmed.
   const slogan = isKo
     ? "서울 사는 메이트가 알려주는"
     : "ソウルに住むメイトが教える";

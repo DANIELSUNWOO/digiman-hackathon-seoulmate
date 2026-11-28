@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { MyMapsScreen } from "../../src/features/mate-home";
 import { useRole } from "../../src/state";
-import { Label, Screen } from "../../src/ui";
+import { Button, Label, Screen } from "../../src/ui";
 export default function Map() {
   const { role } = useRole();
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function Map() {
   return (
     <Screen>
       <Label title>地図</Label>
-      <Label>準備中です</Label>
+      <Button label="地図を選ぶ" onPress={() => router.push("/explore")} />
     </Screen>
   );
 }

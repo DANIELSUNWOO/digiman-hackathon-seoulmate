@@ -40,8 +40,7 @@
 | T-28 쪽지 | `GET /matches/{id}/messages` (주기적으로 다시 부르기) · `POST .../messages {content}` |
 | T-92·93 끊기 | `POST /matches/{id}/cancel {reason?, detail?}` → 홈으로, `slots` 갱신 |
 | T-30 여행 완료 | `POST /matches/{id}/complete` → `albumId` |
-| T-31·32 앨범·후기 | `GET /matches/{id}/album` · `POST /matches/{id}/reviews` |
-| C-02a 받은 후기 | `GET /users/me/reviews` → `{average, count, distribution, items}` (여행자·메이트 공통) |
+| T-31 앨범 | `GET /matches/{id}/album` (상호 후기 T-32는 결선 범위 제외) |
 | C-02 마이 | `GET /users/me/stats` → `{tripDay, matesMet, visitedSpots}` (`tripDay` 는 여행 시작 전이면 null) |
 
 ## 4. 메이트(한국) 흐름

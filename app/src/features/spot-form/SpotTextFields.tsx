@@ -1,4 +1,4 @@
-// 스팟 이름·후기·추천 이유 입력.
+// 스팟 이름·소개·추천 이유 입력.
 import type { ReactElement } from "react";
 import { Input, Label } from "../../ui";
 import { NAME_MAX } from "../spot-location";

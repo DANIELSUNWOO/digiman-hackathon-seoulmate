@@ -1,7 +1,6 @@
 // C-01 알림 목록. 홈에서는 NotificationBell로 들어온다.
 import type { ReactElement } from "react";
-import { ActivityIndicator } from "react-native";
-import { theme } from "../../theme";
+import { LoadingSkeleton } from "../../loading";
 import { Button, Label, Screen } from "../../ui";
 import { notificationsApi, type NotificationsApi } from "./api";
 import { errorText } from "./errors";
@@ -49,10 +48,7 @@ export function NotificationsScreen({
         {text.title}
       </Label>
       {state.status === "loading" && (
-        <ActivityIndicator
-          accessibilityLabel={text.loading}
-          color={theme.color.mainInk}
-        />
+        <LoadingSkeleton shape="rows" label={text.loading} />
       )}
       {state.status === "error" && (
         <>

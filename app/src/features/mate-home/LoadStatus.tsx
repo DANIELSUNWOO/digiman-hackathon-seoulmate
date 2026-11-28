@@ -1,16 +1,10 @@
-import { ActivityIndicator } from "react-native";
-import { theme } from "../../theme";
+import { LoadingSkeleton, type LoadingShape } from "../../loading";
 import { Button, Label } from "../../ui";
 import { errorMessage } from "./errors";
 import { strings } from "./strings";
 
-export function Loading() {
-  return (
-    <ActivityIndicator
-      accessibilityLabel={strings.loading}
-      color={theme.color.mainInk}
-    />
-  );
+export function Loading({ shape = "cards" }: { shape?: LoadingShape }) {
+  return <LoadingSkeleton label={strings.loading} shape={shape} />;
 }
 
 export function LoadError({

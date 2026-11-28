@@ -4,7 +4,13 @@ import type { MateHomeApi } from "./api";
 import { ENDED_MATCHES, MAPS, MATCHES, mockSpots } from "./mockData";
 import type { MapDetail, MapInput, MyMap } from "./types";
 
-export type MockScenario = "data" | "empty" | "error";
+/** noMatch: 노출 중인 지도만 있고 매칭 없음. draft: 미완성 지도만 있음 */
+export type MockScenario = "data" | "noMatch" | "draft" | "empty" | "error";
+
+function mockMaps(scenario: MockScenario): MyMap[] {
+  if (scenario === "data" || scenario === "noMatch") return MAPS;
+  return scenario === "draft" ? MAPS.filter((map) => !map.isPublic) : [];
+}
 
 function serverError(status: number, code: string) {
   return new ApiError("HTTP", "mock server error", status, { code });
@@ -76,7 +82,7 @@ function createMapStore(initial: MyMap[]) {
 }
 
 export function createMockMateHomeApi(scenario: MockScenario): MateHomeApi {
-  const store = createMapStore(scenario === "data" ? MAPS : []);
+  const store = createMapStore(mockMaps(scenario));
   const matches = scenario === "data" ? MATCHES : [];
   const respond = <T>(action: () => T): Promise<T> =>
     new Promise((resolve, reject) => {

@@ -24,7 +24,13 @@ import { createMockPlaceSearchApi } from "../../src/features/place-search/mockAp
 import { theme } from "../../src/theme";
 import { Chip } from "../../src/ui";
 
-const SCENARIOS: MockScenario[] = ["data", "empty", "error"];
+const SCENARIOS: MockScenario[] = [
+  "data",
+  "noMatch",
+  "draft",
+  "empty",
+  "error",
+];
 const mockPlaces = createMockPlaceSearchApi("data");
 
 type DevView =
@@ -123,6 +129,8 @@ function DevScreen({ api, view, onView }: DevScreenProps) {
         // 방문 기록은 별도 목 화면에서 본다 (매칭 번호와 무관한 같은 목 데이터).
         onOpenVisits={() => router.push("/dev/visits")}
         onOpenAlbum={() => router.push("/dev/album")}
+        onOpenMap={showDetail}
+        onCreateMap={() => onView({ name: "new" })}
       />
     );
   if (view.name === "maps")

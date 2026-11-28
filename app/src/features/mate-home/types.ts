@@ -62,6 +62,7 @@ export type MatchItem = {
     required: number | null;
     total: number;
   } | null;
+  trip: TripRange | null;
   lastVisitAt: string | null;
 };
 

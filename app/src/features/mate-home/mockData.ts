@@ -49,6 +49,7 @@ export const MATCHES: MatchItem[] = [
     partner: { nickname: "ゆうと" },
     courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
     progress: { visited: 0, required: 3, total: 6 },
+    trip: { startDate: "2026-12-03", endDate: "2026-12-08" },
     lastVisitAt: null,
   },
   {
@@ -57,6 +58,7 @@ export const MATCHES: MatchItem[] = [
     partner: { nickname: "はるか" },
     courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
     progress: { visited: 2, required: 3, total: 6 },
+    trip: { startDate: "2026-11-28", endDate: "2026-12-03" },
     lastVisitAt: "2026-11-29T14:03:00+09:00",
   },
   {
@@ -65,6 +67,7 @@ export const MATCHES: MatchItem[] = [
     partner: { nickname: "みお" },
     courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
     progress: { visited: 3, required: 3, total: 6 },
+    trip: { startDate: "2026-11-27", endDate: "2026-11-30" },
     lastVisitAt: "2026-11-29T11:20:00+09:00",
   },
   {
@@ -73,6 +76,7 @@ export const MATCHES: MatchItem[] = [
     partner: { nickname: "そら" },
     courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
     progress: { visited: 4, required: 3, total: 6 },
+    trip: { startDate: "2026-11-26", endDate: "2026-11-29" },
     lastVisitAt: "2026-11-28T18:45:00+09:00",
   },
 ];

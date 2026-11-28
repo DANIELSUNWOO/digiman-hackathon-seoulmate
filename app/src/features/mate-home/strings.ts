@@ -3,6 +3,14 @@ export const strings = {
   homeTitle: "홈",
   matchSection: "진행 중인 여행자",
   matchEmpty: "아직 매칭된 여행자가 없어요",
+  // 아래 M-20 문구는 검수 전이다.
+  matchEmptyHint: "여행자가 매칭하면 여기에 나타나요",
+  notExposedTitle: "아직 여행자에게 보이지 않아요",
+  notExposedNoMap: (spots: number, previews: number) =>
+    `스팟 ${spots}곳 이상, 공개 스팟 ${previews}곳이 있는 지도가 필요해요`,
+  continueMap: "지도 마저 만들기",
+  locationNotice: "여행자의 위치는 공유되지 않아요",
+  closeNotice: "안내 닫기",
   endedSection: "끝난 여행",
   tripCompleted: "여행 완료",
   tripExpired: "기간 만료",

@@ -1,13 +1,15 @@
 // M-20 메이트 홈: 매칭 현황과 여행자 목록.
 import { useCallback, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
-import { Card, Label, Screen } from "../../ui";
+import { Label, Screen } from "../../ui";
 import { mateHomeApi, type MateHomeApi } from "./api";
+import { EmptyMatches } from "./EmptyMatches";
 import { EndedTrips } from "./EndedTrips";
 import { LoadError, Loading } from "./LoadStatus";
-import { progressLabel, sortByLastVisit, visitTimeLabel } from "./model";
+import { LocationNotice } from "./LocationNotice";
+import { MatchList } from "./MatchList";
 import { strings } from "./strings";
-import type { MatchItem, MateProfile } from "./types";
+import type { MateProfile } from "./types";
 import { useLoad } from "./useLoad";
 
 export interface MateHomeScreenProps {
@@ -16,6 +18,8 @@ export interface MateHomeScreenProps {
   headerRight?: ReactNode;
   onOpenVisits: (matchId: number) => void;
   onOpenAlbum: (matchId: number) => void;
+  onOpenMap: (mapId: number) => void;
+  onCreateMap: () => void;
 }
 
 export function MateHomeScreen({
@@ -23,6 +27,8 @@ export function MateHomeScreen({
   headerRight,
   onOpenVisits,
   onOpenAlbum,
+  onOpenMap,
+  onCreateMap,
 }: MateHomeScreenProps) {
   const load = useCallback(
     () => Promise.all([api.getProfile(), api.getActiveMatches()]),
@@ -38,17 +44,23 @@ export function MateHomeScreen({
         </Label>
         {headerRight}
       </View>
+      <LocationNotice />
       {state.status === "loading" && <Loading />}
       {state.status === "error" && (
         <LoadError error={state.error} onRetry={retry} />
       )}
       {state.status === "ready" && (
         <>
-          <MatchList
-            profile={state.data[0]}
-            matches={state.data[1]}
-            onOpenVisits={onOpenVisits}
-          />
+          <SectionTitle profile={state.data[0]} />
+          {state.data[1].length === 0 ? (
+            <EmptyMatches
+              api={api}
+              onOpenMap={onOpenMap}
+              onCreateMap={onCreateMap}
+            />
+          ) : (
+            <MatchList matches={state.data[1]} onOpenVisits={onOpenVisits} />
+          )}
           <EndedTrips api={api} onOpenAlbum={onOpenAlbum} />
         </>
       )}
@@ -56,39 +68,14 @@ export function MateHomeScreen({
   );
 }
 
-function MatchList({
-  profile,
-  matches,
-  onOpenVisits,
-}: {
-  profile: MateProfile;
-  matches: MatchItem[];
-  onOpenVisits: (matchId: number) => void;
-}) {
+function SectionTitle({ profile }: { profile: MateProfile }) {
   const capacity = profile.matchCapacity;
   return (
-    <>
-      <Label weight="bold" language="ko">
-        {capacity
-          ? `${strings.matchSection} ${capacity.active} / ${capacity.max}`
-          : strings.matchSection}
-      </Label>
-      {matches.length === 0 && (
-        <Label language="ko">{strings.matchEmpty}</Label>
-      )}
-      {sortByLastVisit(matches).map((match) => (
-        <Card key={match.matchId} onPress={() => onOpenVisits(match.matchId)}>
-          <Label weight="bold" language="ja">
-            {match.partner.nickname}
-          </Label>
-          {match.courseMap && (
-            <Label language="ko">{match.courseMap.title}</Label>
-          )}
-          <Label language="ko">{progressLabel(match)}</Label>
-          <Label language="ko">{visitTimeLabel(match.lastVisitAt)}</Label>
-        </Card>
-      ))}
-    </>
+    <Label weight="bold" language="ko">
+      {capacity
+        ? `${strings.matchSection} ${capacity.active} / ${capacity.max}`
+        : strings.matchSection}
+    </Label>
   );
 }
 

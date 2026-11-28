@@ -45,6 +45,14 @@ export function sortByLastVisit(matches: readonly MatchItem[]): MatchItem[] {
   return [...matches].sort((a, b) => time(b) - time(a));
 }
 
+/** 노출 조건을 가장 많이 채운 지도. 지도가 없으면 null */
+export function closestToExposure(maps: readonly MyMap[]): MyMap | null {
+  const score = (map: MyMap) =>
+    Math.min(map.spotCount, MAP_MIN_SPOTS) +
+    Math.min(map.previewCount, MAP_PREVIEW_SPOTS);
+  return [...maps].sort((a, b) => score(b) - score(a))[0] ?? null;
+}
+
 /** 수정 요청에는 바뀐 값만 담는다. */
 export function changedFields(
   before: MapInput,

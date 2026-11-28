@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-// M-11 지도 이름·캡션: 만들기와 수정이 같은 폼을 쓴다.
+// M-11 지도 이름·한 줄 소개: 만들기와 수정이 같은 폼을 쓴다.
 import { Label, Screen } from "../../ui";
 import { mateHomeApi, type MateHomeApi } from "./api";
 import { BackButton } from "./BackButton";

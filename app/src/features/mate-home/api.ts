@@ -15,7 +15,7 @@ export type MateHomeApi = {
   getEndedMatches: () => Promise<EndedMatch[]>;
   getMapDetail: (mapId: number) => Promise<MapDetail>;
   createMap: (input: MapInput) => Promise<{ mapId: number }>;
-  /** 바뀐 값만 보낸다. 캡션을 보내면 서버가 번역을 다시 한다. */
+  /** 바뀐 값만 보낸다. 한 줄 소개(caption)를 보내면 서버가 번역을 다시 한다. */
   updateMap: (mapId: number, changes: Partial<MapInput>) => Promise<unknown>;
   deleteMap: (mapId: number) => Promise<void>;
   /** MAP-06. 정확히 2곳이며 기존 공개 스팟을 바꾼다. */

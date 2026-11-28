@@ -4,6 +4,8 @@ export type BrowseState = {
   accountId: string | null;
   filters: Filters;
   result: BrowsePage | null;
+  resultFilters: Filters | null;
+  loadingPage: number | null;
   loading: boolean;
   error: unknown;
 };
@@ -13,6 +15,8 @@ export function createBrowseController(api: MapBrowseApi) {
     accountId: null,
     filters: {},
     result: null,
+    resultFilters: null,
+    loadingPage: null,
     loading: false,
     error: null,
   };
@@ -23,6 +27,7 @@ export function createBrowseController(api: MapBrowseApi) {
   const snapshot = (): BrowseState => ({
     ...state,
     filters: { ...state.filters },
+    resultFilters: state.resultFilters ? { ...state.resultFilters } : null,
     result: state.result
       ? (JSON.parse(JSON.stringify(state.result)) as BrowsePage)
       : null,
@@ -31,7 +36,7 @@ export function createBrowseController(api: MapBrowseApi) {
     generation++;
     active?.abort();
     active = null;
-    state = { ...state, loading: false };
+    state = { ...state, loading: false, loadingPage: null };
   };
   async function load(page: number, append: boolean): Promise<void> {
     if (disposed || !state.accountId || !token)
@@ -43,7 +48,7 @@ export function createBrowseController(api: MapBrowseApi) {
     const account = state.accountId;
     const requestToken = token;
     const filters = captureFilters(state.filters);
-    state = { ...state, loading: true, error: null };
+    state = { ...state, loading: true, loadingPage: page, error: null };
     try {
       const response = await browse(
         requestToken,
@@ -64,12 +69,14 @@ export function createBrowseController(api: MapBrowseApi) {
       state = {
         ...state,
         result: { ...response, items },
+        resultFilters: filters,
+        loadingPage: null,
         loading: false,
         error: null,
       };
     } catch (error) {
       if (current === generation && !disposed)
-        state = { ...state, loading: false, error };
+        state = { ...state, loading: false, loadingPage: null, error };
     } finally {
       if (current === generation) active = null;
     }
@@ -93,6 +100,8 @@ export function createBrowseController(api: MapBrowseApi) {
         accountId,
         filters: {},
         result: null,
+        resultFilters: null,
+        loadingPage: null,
         loading: false,
         error: null,
       };
@@ -100,16 +109,22 @@ export function createBrowseController(api: MapBrowseApi) {
     async setFilters(filters: Filters) {
       const captured = captureFilters(filters);
       cancel();
-      state = { ...state, filters: captured, result: null, error: null };
+      state = { ...state, filters: captured, error: null };
       await load(0, false);
     },
     async refresh() {
       cancel();
-      state = { ...state, result: null, error: null };
+      state = { ...state, error: null };
       await load(0, false);
     },
     async nextPage() {
-      if (active || !state.result?.hasNext) return;
+      if (
+        active ||
+        !state.result?.hasNext ||
+        JSON.stringify(captureFilters(state.filters)) !==
+          JSON.stringify(state.resultFilters)
+      )
+        return;
       await load(state.result.page + 1, true);
     },
     cancel,
@@ -121,6 +136,8 @@ export function createBrowseController(api: MapBrowseApi) {
         accountId: null,
         filters: {},
         result: null,
+        resultFilters: null,
+        loadingPage: null,
         loading: false,
         error: null,
       };

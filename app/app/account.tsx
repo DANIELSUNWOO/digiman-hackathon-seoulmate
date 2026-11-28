@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../src/loading";
 import { Redirect, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -96,7 +97,13 @@ export default function Account() {
         </View>
       )}
 
-      {session && (load.kind === "loading" || busy) && (
+      {session && load.kind === "loading" && (
+        <LoadingSkeleton
+          shape="profile"
+          label={ko ? "계정을 불러오는 중입니다" : "アカウントを読み込み中"}
+        />
+      )}
+      {session && busy && (
         <Notice language={language}>
           {ko ? "확인 중입니다" : "確認中です"}
         </Notice>

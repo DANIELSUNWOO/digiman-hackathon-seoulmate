@@ -59,8 +59,8 @@ const ScreenScrollContext = createContext<ScreenScrollContextValue | null>(
   null,
 );
 
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
+export function useReducedMotion(initial = false): boolean {
+  const [reduced, setReduced] = useState(initial);
 
   useEffect(() => {
     let active = true;

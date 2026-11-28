@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../src/loading";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Image } from "react-native";
@@ -187,7 +188,9 @@ export default function Preview() {
           />
         </>
       )}
-      {!preview && !error && <Label>読み込み中...</Label>}
+      {!preview && !error && (
+        <LoadingSkeleton shape="preview" label="地図を読み込み中" />
+      )}
       {preview && (
         <>
           <Label title>{text(preview.title)}</Label>

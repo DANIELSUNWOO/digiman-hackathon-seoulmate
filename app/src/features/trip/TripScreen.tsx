@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../loading";
 import { useOnboardingBackHandler } from "../onboarding/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
@@ -261,7 +262,7 @@ export function TripScreen(props: TripScreenProps) {
         出発日と帰国日を順番にタップしてください。
       </Label>
       {status === "loading" ? (
-        <Label language="ja">読み込み中...</Label>
+        <LoadingSkeleton shape="calendar" label="日程を読み込み中" />
       ) : status === "error" ? (
         <Button
           language="ja"

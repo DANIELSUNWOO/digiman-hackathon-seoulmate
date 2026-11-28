@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../src/loading";
 import {
   Redirect,
   useFocusEffect,
@@ -260,7 +261,7 @@ export default function PreferencesScreen() {
         希望する条件を選んでください。
       </Label>
       {status === "loading" ? (
-        <Label language="ja">読み込み中...</Label>
+        <LoadingSkeleton shape="chips" label="条件を読み込み中" />
       ) : status === "error" ? (
         <Button
           secondary

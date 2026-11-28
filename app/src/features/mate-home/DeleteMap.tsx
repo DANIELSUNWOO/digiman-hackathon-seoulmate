@@ -9,6 +9,7 @@ export function DeleteMap({ api, mapId, onDeleted }: Props) {
   return (
     <ConfirmDelete
       label={strings.remove}
+      link
       title={strings.removeConfirm}
       warning={strings.removeWarning}
       onDelete={() => api.deleteMap(mapId)}

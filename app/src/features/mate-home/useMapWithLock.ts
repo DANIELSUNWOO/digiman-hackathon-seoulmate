@@ -9,8 +9,12 @@ export function useMapWithLock(api: MateHomeApi, mapId: number) {
       api.getMapDetail(mapId),
       api.getMyMaps(),
     ]);
-    const locked = myMaps.some((item) => item.mapId === mapId && item.inUse);
-    return { map, locked };
+    const mine = myMaps.find((item) => item.mapId === mapId);
+    return {
+      map,
+      locked: mine?.inUse ?? false,
+      selectedCount: mine?.selectedCount,
+    };
   }, [api, mapId]);
   return useLoad(load);
 }

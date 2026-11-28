@@ -14,6 +14,9 @@ export default function Detail() {
     <MapDetailScreen
       mapId={mapId}
       onBack={back}
+      onAddSpot={() => router.push(`/maps/${mapId}/spots/new`)}
+      onOpenSpot={(spotId) => router.push(`/maps/${mapId}/spots/${spotId}`)}
+      onPickPreviews={() => router.push(`/maps/${mapId}/previews`)}
       onEdit={() => router.push(`/maps/${mapId}/edit`)}
       onDeleted={back}
     />

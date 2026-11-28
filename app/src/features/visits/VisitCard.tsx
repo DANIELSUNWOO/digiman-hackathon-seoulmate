@@ -64,14 +64,25 @@ export function VisitCard({
   );
 }
 
-export type VisitPhotoProps = Pick<VisitCardProps, "visit" | "lang">;
+export interface VisitPhotoProps extends Pick<
+  VisitCardProps,
+  "visit" | "lang"
+> {
+  /** 없으면 4:3으로 보여 준다. */
+  height?: number;
+}
 
-export function VisitPhoto({ visit, lang }: VisitPhotoProps): ReactElement {
+export function VisitPhoto({
+  visit,
+  lang,
+  height,
+}: VisitPhotoProps): ReactElement {
   const [failed, setFailed] = useState(false);
   const text = strings[lang];
+  const size = height ? { height, aspectRatio: undefined } : null;
   if (failed)
     return (
-      <View style={[styles.photo, styles.photoFailed]}>
+      <View style={[styles.photo, styles.photoFailed, size]}>
         <Label center language={lang}>
           {text.photoFailed}
         </Label>
@@ -82,7 +93,7 @@ export function VisitPhoto({ visit, lang }: VisitPhotoProps): ReactElement {
       source={{ uri: visit.photoUrl }}
       accessibilityLabel={text.photoLabel(visit.spot.name)}
       onError={() => setFailed(true)}
-      style={styles.photo}
+      style={[styles.photo, size]}
     />
   );
 }

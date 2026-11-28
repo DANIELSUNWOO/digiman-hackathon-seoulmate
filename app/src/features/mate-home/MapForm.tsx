@@ -30,7 +30,7 @@ function useMapForm({ initial, onSubmit }: Props) {
   return { title, setTitle, caption, setCaption, saving, error, save };
 }
 
-/** 이름만 필수다. 캡션은 비워 둘 수 있다. */
+/** 이름만 필수다. 한 줄 소개는 비워 둘 수 있다. */
 export function MapForm(props: Props) {
   const { title, setTitle, caption, setCaption, saving, error, save } =
     useMapForm(props);

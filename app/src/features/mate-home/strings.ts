@@ -1,8 +1,53 @@
 // 메이트 화면은 한국어만 쓴다. 앱에 i18n 라이브러리가 정해지면 이 키를 옮긴다.
+function owner(name?: string): string {
+  return name ? `${name}님의` : "내";
+}
+
 export const strings = {
-  homeTitle: "홈",
-  matchSection: "진행 중인 여행자",
-  matchEmpty: "아직 매칭된 여행자가 없어요",
+  // M-20 문구는 프로토타입 v9를 따른다.
+  appName: "서울메이트",
+  greeting: {
+    matched: (name?: string) => `${owner(name)} 지도를\n여행자가 걷고 있어요`,
+    waiting: (name?: string) =>
+      `${owner(name)} 지도가\n여행자를 기다리고 있어요`,
+    unpublished: (name?: string) => `${owner(name)} 지도를\n완성해 주세요`,
+  },
+  greetingSub: {
+    matched: () => "여행자가 스팟을 인증하면 바로 알려 드려요",
+    waiting: () => "여행자가 지도를 고르면 바로 알려 드려요",
+    unpublished: (spots: number, previews: number) =>
+      `스팟 ${spots}곳과 공개 스팟 ${previews}곳을 채우면 여행자에게 보여요`,
+  },
+  traveling: "함께 여행 중",
+  capacityHint: (max: number) => `${max}명이 되면 새 추천에서 잠시 빠져요`,
+  tripPill: "여행 중",
+  checkIns: (visited: number, total: number) => `인증 ${visited} / ${total}`,
+  chatLeft: (count: number) => `${count}곳 남음`,
+  chatOk: "채팅 OK",
+  recentSection: "최근 방문",
+  recentVisit: (name: string, spot: string) =>
+    `${name}님이 ${spot}에 다녀갔어요`,
+  justNow: "방금",
+  minutesAgo: (count: number) => `${count}분 전`,
+  hoursAgo: (count: number) => `${count}시간 전`,
+  daysAgo: (count: number) => `${count}일 전`,
+  monthDay: (month: number, day: number) => `${month}월 ${day}일`,
+  waitingTitle: "아직 함께 여행 중인 여행자가 없어요",
+  waitingBody:
+    "공개 스팟 2곳이 여행자의 지도 고르기 화면에 보이고 있어요. 공개 스팟의 사진과 소개를 채우면 더 많이 골라져요.",
+  openMyMaps: "내 비밀지도 보기",
+  unpublishedTitle: "아직 여행자에게 보이는 지도가 없어요",
+  unpublishedBody:
+    "지도를 공개하면 취향이 맞는 여행자의 지도 고르기 화면에 나타나요.",
+  continueMap: "지도 이어서 만들기",
+  previewShortage: (count: number, required: number) =>
+    `공개 ${count} / ${required}`,
+  locationNotice: "여행자의 위치는 공유되지 않아요",
+  closeNotice: "안내 닫기",
+  endedSection: "끝난 여행",
+  tripCompleted: "여행 완료",
+  tripExpired: "기간 만료",
+  openAlbum: "앨범 보기",
   mapsTitle: "내 지도",
   mapsEmpty: "아직 만든 지도가 없어요",
   createMap: "지도 만들기",
@@ -11,7 +56,7 @@ export const strings = {
   editMapTitle: "지도 수정",
   titleField: "지도 이름",
   titlePlaceholder: "예: 혼자 가기 좋은 성수 카페",
-  captionField: "캡션 (선택)",
+  captionField: "한 줄 소개 (선택)",
   captionPlaceholder: "어떤 지도인지 한두 문장으로 알려 주세요",
   save: "저장",
   saving: "저장 중",
@@ -26,10 +71,29 @@ export const strings = {
   spotSection: "스팟",
   spotEmpty: "아직 등록한 스팟이 없어요",
   spotPreview: "공개 스팟",
-  spotReview: (text: string) => `후기 · ${text}`,
+  spotReview: (text: string) => `소개 · ${text}`,
   spotReason: (text: string) => `추천 이유 · ${text}`,
   addSpot: "스팟 추가",
-  addSpotPending: "스팟 추가는 준비 중이에요",
+  exposureSection: "노출 조건",
+  exposureSpots: (count: number, min: number) =>
+    `스팟 ${min}곳 이상 · 지금 ${count}곳`,
+  exposurePreviews: (count: number, required: number) =>
+    `공개 스팟 ${required}곳 · 지금 ${count}곳`,
+  met: "충족",
+  unmet: "미충족",
+  pickPreviews: "공개 스팟 고르기",
+  previewsTitle: "공개 스팟",
+  previewsGuide:
+    "여행자가 지도를 고르기 전에 볼 수 있는 2곳이에요. 가장 자신 있는 곳을 골라 주세요",
+  previewsLockNotice:
+    "공개 스팟은 다른 곳으로 바꾸기 전에는 고치거나 지울 수 없어요",
+  previewsNeedSpots: "스팟을 2곳 이상 등록하면 고를 수 있어요",
+  previewsLocked: "여행 중인 여행자가 있어 공개 스팟을 바꿀 수 없어요",
+  previewsFull: "2곳까지만 고를 수 있어요. 바꾸려면 먼저 하나를 해제해 주세요",
+  previewSelected: "선택됨",
+  previewRemaining: (count: number) => `${count}곳 더 고르세요`,
+  errorPreviewCount: "공개 스팟은 2곳을 골라 주세요",
+  errorSpotChanged: "스팟 목록이 바뀌었어요. 다시 들어와 주세요",
   exposed: "노출 중",
   hidden: "노출 안 됨",
   loading: "불러오는 중",
@@ -44,7 +108,7 @@ export const strings = {
   errorMapInUse:
     "여행 코스로 선택됐거나 방문 기록이 있는 지도는 삭제할 수 없어요",
   errorMapLocked: "여행 중인 여행자가 있어 지금은 바꿀 수 없어요",
-  errorValidation: "이름은 30자, 캡션은 300자까지 쓸 수 있어요",
+  errorValidation: "이름은 30자, 한 줄 소개는 300자까지 쓸 수 있어요",
   spotCount: (count: number) => `스팟 ${count}곳`,
   spotShortage: (count: number, min: number) => `스팟 ${count} / ${min}`,
   previewCount: (count: number, required: number) =>
@@ -52,10 +116,5 @@ export const strings = {
   selectedCount: (count: number) => `코스로 선택 ${count}회`,
   travelingCount: (count: number) => `지금 ${count}명이 여행 중`,
   courseNotSelected: "코스 선택 전",
-  visited: (visited: number, total: number) => `${visited} / ${total}곳 인증`,
-  chatOpen: "채팅 중",
-  chatRemaining: (count: number) => `채팅까지 ${count}곳`,
-  chatReady: "여행자가 채팅을 열 수 있어요",
   noVisit: "아직 방문 기록이 없어요",
-  lastVisit: (when: string) => `최근 방문 ${when}`,
 } as const;

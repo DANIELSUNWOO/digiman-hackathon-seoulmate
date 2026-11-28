@@ -8,13 +8,13 @@ import {
 } from "react-native";
 import { theme } from "../../theme";
 import { AppBar, Button, ErrorNotice, Label, Notice, Screen } from "../../ui";
+import { pickPhoto as pickFromDevice, type PickPhoto } from "../photo-upload";
 import { visitVerifyApi, type VisitVerifyApi } from "./api";
 import { errorText } from "./errors";
 import { readPosition as readFromDevice } from "./location";
-import { pickPhoto as pickFromDevice } from "./photo";
 import { strings } from "./strings";
 import { createSubmit } from "./submission";
-import type { PickPhoto, ReadPosition, SubmitVisit } from "./types";
+import type { ReadPosition, SubmitVisit } from "./types";
 import { useSpot, type SpotLoad } from "./useSpot";
 import { VerifyForm } from "./VerifyForm";
 

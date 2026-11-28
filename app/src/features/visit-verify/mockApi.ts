@@ -1,6 +1,7 @@
 import { ApiError } from "../../api";
+import type { PickPhoto } from "../photo-upload";
 import type { VisitVerifyApi } from "./api";
-import type { PickPhoto, ReadPosition } from "./types";
+import type { ReadPosition } from "./types";
 
 export type MockScenario = "data" | "visited" | "missing" | "error" | "denied";
 export type MockSubmit = "ok" | "far" | "uploadFail" | "already";

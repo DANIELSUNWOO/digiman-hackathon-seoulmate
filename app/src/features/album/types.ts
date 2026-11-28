@@ -4,6 +4,7 @@ import type { VisitRecord } from "../visits";
 export interface AlbumMember {
   userId: string;
   nickname: string;
+  profileImageUrl: string | null;
 }
 
 export interface AlbumMap {
@@ -23,4 +24,10 @@ export interface Album {
   map: AlbumMap | null;
   /** VISIT-02와 같은 형태, 최근 인증 순 */
   items: VisitRecord[];
+}
+
+/** MATCH-03의 여행 일정. 앨범 응답에는 없다. */
+export interface TripRange {
+  startDate: string;
+  endDate: string;
 }

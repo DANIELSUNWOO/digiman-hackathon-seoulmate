@@ -1,6 +1,6 @@
 // 홈에 두는 알림 진입 버튼과 안 읽음 배지.
 import { Bell } from "phosphor-react-native";
-import type { ReactElement } from "react";
+import { createContext, useContext, type ReactElement } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { theme } from "../../theme";
 import { notificationsApi, type NotificationsApi } from "./api";
@@ -8,6 +8,9 @@ import { badgeLabel } from "./model";
 import { strings } from "./strings";
 import type { NotificationLang } from "./types";
 import { useUnreadCount } from "./useUnreadCount";
+
+/** 파란 머리처럼 어두운 배경에서 종 색을 바꾼다. */
+export const BellColorContext = createContext<string>(theme.color.text);
 
 export interface NotificationBellProps {
   api?: NotificationsApi;
@@ -21,6 +24,7 @@ export function NotificationBell({
   onPress,
 }: NotificationBellProps): ReactElement {
   const badge = badgeLabel(useUnreadCount(api));
+  const bellColor = useContext(BellColorContext);
   const { title, unread } = strings[lang];
   const fontFamily = `NotoSans${lang === "ko" ? "KR" : "JP"}_700Bold`;
   return (
@@ -32,7 +36,7 @@ export function NotificationBell({
       onPress={onPress}
       style={styles.button}
     >
-      <Bell size={theme.size.icon} color={theme.color.text} />
+      <Bell size={theme.size.icon} color={bellColor} />
       {badge !== null && (
         <View style={styles.badge}>
           <Text style={[styles.count, { fontFamily }]}>{badge}</Text>

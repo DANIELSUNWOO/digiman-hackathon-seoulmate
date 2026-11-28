@@ -1,5 +1,11 @@
 // 개발 전용 목 데이터.
-import type { MapSpot, MatchItem, MyMap } from "./types";
+import type {
+  EndedMatch,
+  MapSpot,
+  MatchItem,
+  MyMap,
+  VisitSummary,
+} from "./types";
 
 export const MAPS: MyMap[] = [
   {
@@ -49,6 +55,7 @@ export const MATCHES: MatchItem[] = [
     partner: { nickname: "ゆうと" },
     courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
     progress: { visited: 0, required: 3, total: 6 },
+    trip: { startDate: "2026-12-03", endDate: "2026-12-08" },
     lastVisitAt: null,
   },
   {
@@ -57,6 +64,7 @@ export const MATCHES: MatchItem[] = [
     partner: { nickname: "はるか" },
     courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
     progress: { visited: 2, required: 3, total: 6 },
+    trip: { startDate: "2026-11-28", endDate: "2026-12-03" },
     lastVisitAt: "2026-11-29T14:03:00+09:00",
   },
   {
@@ -65,6 +73,7 @@ export const MATCHES: MatchItem[] = [
     partner: { nickname: "みお" },
     courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
     progress: { visited: 3, required: 3, total: 6 },
+    trip: { startDate: "2026-11-27", endDate: "2026-11-30" },
     lastVisitAt: "2026-11-29T11:20:00+09:00",
   },
   {
@@ -73,15 +82,42 @@ export const MATCHES: MatchItem[] = [
     partner: { nickname: "そら" },
     courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
     progress: { visited: 4, required: 3, total: 6 },
+    trip: { startDate: "2026-11-26", endDate: "2026-11-29" },
     lastVisitAt: "2026-11-28T18:45:00+09:00",
   },
 ];
+
+function mockPhoto(index: number): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" data-spot="${index}"><rect width="1" height="1" fill="#477EFF"/></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+// 1×1 PNG. 실기기의 Image는 SVG data URI를 그리지 못한다.
+const VISIT_PHOTO =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPYc/E/AATZAo2XBzhVAAAAAElFTkSuQmCC";
+
+/** 인증한 적 있는 여행자만 방문 기록이 있다. */
+export function mockVisits(matchId: number): VisitSummary[] {
+  const match = MATCHES.find((item) => item.matchId === matchId);
+  if (!match?.lastVisitAt) return [];
+  return [
+    {
+      visitId: matchId * 10,
+      spot: { spotId: 101, name: "골목 끝 베이글집" },
+      photoUrl: VISIT_PHOTO,
+      verifiedAt: match.lastVisitAt,
+    },
+  ];
+}
 
 export function mockSpots(map: MyMap): MapSpot[] {
   return Array.from({ length: map.spotCount }, (_, index) => ({
     spotId: map.mapId * 100 + index,
     name: `${map.title} ${index + 1}번 스팟`,
     address: "서울 성동구 아차산로9길 8",
+    lat: 37.5447,
+    lng: 127.0582,
+    photos: [mockPhoto(index)],
     reason: {
       original: "창가 자리가 조용해요",
       translated: null,
@@ -95,3 +131,27 @@ export function mockSpots(map: MyMap): MapSpot[] {
     isPreview: index < map.previewCount,
   }));
 }
+
+export const ENDED_MATCHES: EndedMatch[] = [
+  {
+    matchId: 91,
+    status: "EXPIRED",
+    partner: { nickname: "さくら" },
+    courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
+    trip: { startDate: "2026-11-10", endDate: "2026-11-14" },
+  },
+  {
+    matchId: 92,
+    status: "COMPLETED",
+    partner: { nickname: "はると" },
+    courseMap: { mapId: 1, title: "혼자 가기 좋은 성수 카페" },
+    trip: { startDate: "2026-10-29", endDate: "2026-11-21" },
+  },
+  {
+    matchId: 93,
+    status: "CANCELED",
+    partner: { nickname: "취소된 여행자" },
+    courseMap: null,
+    trip: null,
+  },
+];

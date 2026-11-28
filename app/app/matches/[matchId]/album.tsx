@@ -28,6 +28,8 @@ export default function MatchAlbum(): ReactElement | null {
       onBack={() =>
         router.canGoBack() ? router.back() : router.replace("/(tabs)")
       }
+      onHome={() => router.replace("/(tabs)")}
+      onOpenVisits={() => router.push(`/matches/${matchId}/visits`)}
     />
   );
 }

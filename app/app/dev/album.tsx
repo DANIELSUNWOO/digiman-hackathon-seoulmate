@@ -52,7 +52,9 @@ export default function DevAlbum(): ReactElement {
           matchId={101}
           lang={isMate ? "ko" : "ja"}
           isMate={isMate}
-          onBack={() => {}}
+          onBack={() => setPressed("· 뒤로")}
+          onHome={() => setPressed("· 홈")}
+          onOpenVisits={() => setPressed("· 방문 기록")}
           onReport={({ targetType, targetId }) =>
             setPressed(`· 신고 ${targetType} ${targetId}`)
           }

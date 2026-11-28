@@ -1,3 +1,5 @@
+import { syncPreferenceDraftAccount } from "./features/preferences/draft";
+import { syncTagDraftAccount } from "./features/tags/draft";
 import React, {
   createContext,
   useContext,
@@ -6,6 +8,8 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { AuthFlow, type FlowState } from "./authFlow";
+import { syncDraftAccount } from "./features/onboarding/draftStore";
+import { syncTripDraftAccount } from "./features/trip/draft";
 import { getMe, registerUser } from "./users";
 import { supabase } from "./supabase";
 
@@ -48,6 +52,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     flow?.snapshot ?? getEmpty,
     getServerSnapshot,
   );
+  useEffect(() => {
+    syncDraftAccount(state.session?.user.id ?? null);
+    syncTripDraftAccount(state.session?.user.id ?? null);
+    syncPreferenceDraftAccount(state.session?.user.id ?? null);
+    syncTagDraftAccount(state.session?.user.id ?? null);
+  }, [state.session?.user.id]);
   useEffect(() => {
     if (!supabase || !flow) return;
     flow.activate();
